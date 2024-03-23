@@ -1,0 +1,200 @@
+<!doctype html>
+<html>
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="/static/css/output.css" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400..700&family=Madimi+One&family=Marhey:wght@616&display=swap"
+      rel="stylesheet">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='/Image/favico.png') }}">
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    <title>answer page</title>
+
+    <style>
+      body {
+        font-family: Kode Mono;
+      }
+
+      #user_input {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+    </style>
+  </head>
+
+  <body class="bg-orange-50">
+    <div class="flex flex-col justify-between bg-orange-50">
+      <header class="fixed  left-0 right-0 bg-orange-50 ">
+        <div class="flex items-center justify-between px-2 py-2">
+
+          <img src="static/Image/Logo.png" alt="image" class="w-24 h-28 sm:w-40 sm:h-40">
+
+
+          <div class="flex items-center">
+            <img src="static/Image/lights.png" alt="image" class="hidden sm:block  sm:w-15 sm:h-8 md:h-12">
+            <h1 class=" text-3xl sm:text-4xl md:text-6xl font-bold pr-0">SignalVerse</h1>
+          </div>
+
+          <button
+            class="bg-white border-2 font-bold border-black sm:px-3 sm:py-2 ml-3 leading-tight px-1 hover:bg-green-700 rounded-2xl"
+            onclick="ClearFields()">New Chat</button>
+        </div>
+      </header>
+
+      <!--QUESTIONS AND ANSWERS GO HERE-->
+      <div class=" mt-28 sm:mt-40">
+        <main class="mx-10 sm:mx-20 text-justify mb-40" id="the_content">
+          {% if chat_history %}
+          {% for entry in chat_history %}
+          <p style="color:#2980b9; font-family:'Courier New', Courier, monospace;">
+          <div
+            style="color:rgb(70, 69, 69); font-family:'Times New Roman', Times, serif;  margin-top: 10px; text-align: justify;"
+            class="sm:text-lg">
+            Question: {{ entry['question'] }}<br></div>
+          <div
+            style=" color: #010204; margin-top: 8px;font-family:Georgia, 'Times New Roman', Times, serif;  text-align: justify;"
+            class="font-medium sm:text-xl">
+            Answer: {{ entry['answer'] }}<br></div>
+            
+
+          <div id="GFG_DOWN"></div>
+          </p>
+
+
+          {% endfor %}
+
+          <div id="GFG_DIV" class="container">
+            <form action="{{ url_for('rating_submission') }}" method="post" class=" mt-2" id="text2">
+              <label for="rating" id="rating-font" class="font-extrabold  sm:text-lg">Rating: </label>
+              <select id="rating" name="rate" required>
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+              <button id="removeButton"
+                class=" bg-white border-2 font-extrabold border-black px-1 sm:px-3  leading-tight text-sm sm:text-base hover:bg-green-700 rounded-full"
+                onclick="notification()">Submit
+              </button>
+            </form>
+          </div>
+
+          {% endif %}
+        </main>
+      </div>
+
+
+      <footer
+        class="h-28 bg-orange-50 flex justify-between border-4 border-black mx-3 my-1 rounded-md fixed bottom-0 left-0 right-0">
+
+        <form action="/submit_question" method="post" class="flex-grow">
+          <div class="mt-2"><!-- Added flex-grow class -->
+            <label for="user_input" class="ml-6 font-extrabold py-6" id="question-font">Type your question here:</label>
+          </div>
+          <div class="flex"> <!-- Added flex class -->
+            <input type="text" id="user_input" name="quesInput" autocomplete="on" placeholder="Type here:"
+              class="ml-5 flex-grow py-1 px-4 m-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+            <!-- Added flex-grow class -->
+            <button class="bg-white border-2 border-black h-fit mr-3 p-1 mt-2 hover:bg-green-700 ">
+              <img src="static/Image/arrow.png" alt="image" class="w-6 h-6">
+            </button>
+          </div>
+        </form>
+
+
+      </footer>
+
+
+    </div>
+    <script>
+
+      // let up = document.getElementById('GFG_UP');
+      //         let down = document.getElementById('GFG_DOWN');
+      //         let div = document.getElementById('GFG_DIV');
+      //         // up.innerHTML = "Click on button to remove the element.";
+
+      //         function GFG_Fun() {
+      //             div.parentNode.removeChild(div);
+      //             down.innerHTML = "Element is removed.";
+      //         }
+
+
+      // const container = document.getElementById('container');
+      //   const removeButton = document.getElementById('removeButton');
+
+      //   // Add event listener to the button
+      //   removeButton.addEventListener('click', function() {
+      //     // Create a new text element
+      //     const newText = document.createElement('p');
+      //     newText.textContent = 'Div is removed.';
+
+      //     // Replace the div with the text element
+      //     container.parentNode.replaceChild(newText, container);
+      //   });
+
+
+      document.addEventListener('DOMContentLoaded', function () {
+        // Add click event listener to the container
+        document.querySelector('.container').addEventListener('click', function (event) {
+          // Check if the clicked element is a button with the class 'btn-remove'
+          if (event.target.classList.contains('btn-remove')) {
+            // Remove the parent div of the clicked button
+            event.target.parentNode.remove();
+          }
+        });
+      });
+
+
+      function notification() {
+        alert("Rating has been submitted.")
+      }
+
+
+
+
+
+      function ClearFields() {
+        document.getElementById("the_content").innerHTML = "";
+
+        // Send AJAX request to clear chat history
+        fetch('/clear_chat_history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        })
+          .then(response => response.json())
+          .then(data => console.log(data))
+          .catch(error => console.error('Error:', error));
+      }
+
+
+
+
+
+      function scrollToBottom() {
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+
+      // Call the function after the page is loaded
+      window.onload = function () {
+        scrollToBottom();
+      };
+
+      // Call scrollToBottom() after submitting a new question
+      document.forms[0].addEventListener('submit', function () {
+        scrollToBottom();
+      });
+    </script>
+
+
+
+
+
+  </body>
+
+</html>
