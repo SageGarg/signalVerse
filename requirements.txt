@@ -6,3 +6,11 @@ tiktoken
 chromadb
 PyPdfLoader
 
+
+
+npm install -D tailwindcss
+npx tailwindcss init
+./templates/*
+npx tailwindcss -i ./static/src/input.css -o ./static/css/output.css --watch
+change in package.json
+<link href="/static/css/output.css" rel="stylesheet"> in the html files
