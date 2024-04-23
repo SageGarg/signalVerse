@@ -1,27 +1,45 @@
-from flask import Flask, render_template, request, session,jsonify
+from flask import Flask, render_template, request, session,jsonify, redirect, url_for
 import pandas as pd
 from openpyxl import load_workbook
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.vectorstores import Chroma
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
+from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
+
 from langchain.chains import RetrievalQA
 
+#FOR 2nd model
+import os
+from openai import OpenAI
+
+#FOR mySQL
+import mysql.connector
+mydb = mysql.connector.connect(
+  host="localhost",
+  user="root",
+  passwd="working@2024",
+  database = "Inventory"
+)
+
+mycursor = mydb.cursor()
+# mycursor.execute("CREATE DATABASE Inventory")
+# mycursor.execute("CREATE TABLE store (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
+
+
+
+
 loader = PyPDFLoader("signal_timing_manual_fhwa.pdf")
-
-
 pages = loader.load()
+print("document 1 successfully loaded")
 
-
-
-loader2= PyPDFLoader("22097.pdf")
-
-
-
+loader2 = PyPDFLoader("22097.pdf")
 pages2 = loader2.load()
+print("document 2 successfully loaded")
+
+loader3 = PyPDFLoader("mutcd11thedition.pdf")
+pages3 = loader3.load()
+print("document 3 successfully loaded")
 
 
 text_splitter = CharacterTextSplitter(
@@ -31,23 +49,27 @@ text_splitter = CharacterTextSplitter(
     length_function=len
 )
 
-splits = text_splitter.split_documents(pages+pages2)
+splits = text_splitter.split_documents(pages+pages2 + pages3)
 
-len(pages+pages2)
+len(pages+pages2 + pages3)
 
 len(splits)
 
+print("documents splitted")
 
+# pdf_paths = [r"22097.pdf"]
 
 embedding = OpenAIEmbeddings(openai_api_key="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")
 
-persist_directory = 'chroma/stm_brandNew/'
+persist_directory = 'chroma/stm_brandNew2/'
 
 vectordb = Chroma.from_documents(
     documents=splits,
     embedding=embedding,
     persist_directory=persist_directory
 )
+
+print("chroma created")
 
 print(vectordb._collection.count())
 
@@ -58,8 +80,13 @@ OpenAIEmbeddings(openai_api_key="sk-Pbhb81SPMLo2Zax6BgSaT3BlbkFJZndk8vOL0KEVodqR
 vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
 print(vectordb._collection.count())
 
-
+# llm2 = OpenAI(model_name="gpt-3.5-turbo-1106", temperature=0)
 llm = ChatOpenAI(model_name='gpt-3.5-turbo-16k-0613', openai_api_key="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",temperature=0)
+
+openai_api_key = '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'
+os.environ["OPENAI_API_KEY"] = openai_api_key
+client = OpenAI(# defaults to os.environ.get("OPENAI_API_KEY")
+)
 
 qa_chain = RetrievalQA.from_chain_type(
     llm,
@@ -67,7 +94,7 @@ qa_chain = RetrievalQA.from_chain_type(
 )
 
 
-
+print("beginning of frontend code")
 
 #####   BEGINNING OF FRONT END CODE #####
 
@@ -75,19 +102,18 @@ qa_chain = RetrievalQA.from_chain_type(
 app = Flask(__name__)
 app.secret_key = "abcd"
 chat_history = []
-
+global the_user_name
 
 @app.route("/")
 def index():
     chat_history.clear()
     return render_template('index.html')
 
+
 @app.route('/index.html')
 def first():
     chat_history.clear()
     return render_template('index.html')
-
-
 
 
 @app.route('/clear_chat_history', methods=['POST'])
@@ -96,17 +122,18 @@ def clear_chat_history():
     chat_history = []
     return jsonify({'message': 'Chat history cleared successfully'})
 
-# Other routes and application code...
-
 
 @app.route('/answer', methods=['POST'])
 def answer():
+    global the_user_name
     if request.method == 'POST':
         user_name = request.form['user_question']
+        user_email = request.form['user_email']
         session['user_name'] = user_name
-        
+        session['user_email'] = user_email
         chat_history.clear()
         if user_name != "":
+            the_user_name = user_name
             return render_template('answer.html', user_name=user_name)
         
     return render_template("index.html")
@@ -115,67 +142,70 @@ def answer():
 def submit_question():
     if request.method == 'POST':
         ques_input = request.form['quesInput']
-        
         if ques_input != "":
+            user_name = session["user_name"]
+            session["question"] = ques_input
+            return redirect(url_for('display_result', user_name = user_name))
+            
+
+@app.route('/result/<user_name>')
+def display_result(user_name):
+            ques_input = session["question"]
             result = qa_chain({"query": ques_input})
             answer = result["result"]
-            # answer = "I don't have an API key yet; therefore, I won't be able to answer your question."
+            # answer = "coming back soon"
             user_name = session["user_name"]
-            print("I am inside the if conditional")
+            user_email = session["user_email"]
+            
+            prompt = f"In context of traffic signals answer this: {ques_input}\n What is the answer and provide meta data of the answer in the next line:"
+
+            ChipAnswerText = client.chat.completions.create(
+        model="gpt-3.5-turbo-1106",
+        messages=[{"role": "user", "content": prompt}]
+    )
+            # print(ChipAnswerText)
+            ChipAnswer = ChipAnswerText.choices[0].message.content
+            # ChipAnswer = "I will be accessed later"
+
+            
             session["question"] = ques_input
             session["answer"] = answer
-            chat_history.append({'question': ques_input, 'answer': answer})
+            session["ChipAnswer"] = ChipAnswer
+
+            chat_history.append({'question': ques_input, 'answer': answer, 'ChipAnswer': ChipAnswer})
+            print(chat_history)
             return render_template('answer.html', user_name=user_name, chat_history=chat_history)
-         
-            
-@app.route("/rating_submission" , methods = ["POST", "GET"])
-def rating_submission():
-    if request.method == "POST":
-        
-        rating = request.form["rate"]
-        question = session["question"]
-        answer = session["answer"]
-        print("in the rating conditional")
-        user_name = session["user_name"]
-        message = "You rated the above answer: " + rating
-        # chat_history.append({'question': question, 'answer': answer, 'message':message})
-        sheet_name = user_name.upper()
-        excel_file_path = "Book1.xlsx"
-        try:
-            append_data_to_existing_sheet(excel_file_path, sheet_name, question, answer, rating)
-        except FileNotFoundError:
-            create_new_sheet(excel_file_path, sheet_name, question, answer, rating)
-        
-        return render_template('answer.html', user_name=user_name, question=question, answer=answer, chat_history=chat_history, message = message)
-        
-
-
-
-def append_data_to_existing_sheet(excel_file_path, sheet_name, question, answer, rating):
-    workbook = load_workbook(excel_file_path)
+    
     
 
-    if sheet_name in workbook.sheetnames:
-        existing_df = pd.read_excel(excel_file_path, sheet_name=sheet_name)
-        append_df = pd.DataFrame({'Question': [question], 'Answers': [answer], 'Rating': [rating]})
-        updated_df = pd.concat([existing_df, append_df], ignore_index=True)
 
-        with pd.ExcelWriter(excel_file_path, engine='openpyxl', mode='a', if_sheet_exists="overlay") as writer:
-            updated_df.to_excel(writer, sheet_name=sheet_name, index=False)
-        print("Appended data to the existing sheet")
-    else:
-        print("Sheet does not exist. Creating a new sheet.")
-        create_new_sheet(excel_file_path, sheet_name, question, answer, rating)
+@app.route("/rating_submission", methods=["POST"])
+def rating_submission():
+    if request.method == "POST":
+        rating = request.form["rate"]
+        rating2 = request.form["rate2"]
+        question = session["question"]
+        answer = session["answer"]
+        user_name = session["user_name"]
+        user_email = session["user_email"]
+        
+        ChipAnswer = session["ChipAnswer"]
+        # print(answer)
+        # print(ChipAnswer)
+        # chat_histories[user_email].append({'question': question, 'answer': answer, 'message': message})
+        
+        num_row = mycursor.execute("SELECT * FROM store")
+        num_row = len(mycursor.fetchall())
+        sqlFormula = "INSERT INTO store VALUES (%s,%s,%s,%s,%s,%s,%s)"
+        toAppend = (num_row + 1, user_email,question,answer,rating,ChipAnswer,rating2)
+        mycursor.execute(sqlFormula,toAppend)
 
+        mydb.commit()
+        # mycursor.close()
+      
+        return render_template('answer.html', user_name=user_name, question=question, answer=answer,
+                               chat_history=chat_history)
 
-
-def create_new_sheet(excel_file_path, sheet_name, question, answer, rating):
-    new_data = {'Question': [question], 'Answers': [answer], 'Rating': [rating]}
-    updated_df = pd.DataFrame(new_data)
-
-    with pd.ExcelWriter(excel_file_path, engine='openpyxl', mode='a') as writer:
-        updated_df.to_excel(writer, sheet_name=sheet_name, index=False)
-    print("Created a new sheet")
-
+  
 if __name__ == '__main__':
     app.run(debug=True)
