@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SignalVerse</title>
+    <title>SignalVerse - Home Page</title>
     <link rel="shortcut icon" href="{{ url_for('static', filename='/Image/favico.png') }}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,13 +27,49 @@
       <form action="/answer" method="post">
         <p style="font-family: 'Kode Mono', monospace; font-weight: bolder; font-size: larger; text-align: left;">Name:
         </p>
-        <p><input type="text" placeholder="Enter your name here:" name="user_question" /></p>
+        <p><input type="text" placeholder="Enter your name here:" name="user_question" required /></p>
         <p style="font-family: 'Kode Mono', monospace; font-weight: bolder; font-size: larger; text-align: left;">
           E-mail:</p>
-        <p><input type="text" placeholder="Enter your e-mail here:" name="user_question" /></p>
+        <p><input type="email" placeholder="Enter your e-mail here:" name="user_email" required/></p>
         <p><input type="submit" value="Submit" class="submit_button" /></p>
       </form>
     </div>
   </body>
 
+<script>
+
+    
+  function cookieExists(name) {
+    return document.cookie.split(';').some(cookie => cookie.trim().startsWith(name + '='));
+    } 
+
+function doSomething() {
+    
+
+    var myCookie = cookieExists("isloggedin");
+
+    if (!myCookie) {
+        // do cookie doesn't exist stuff;
+        console.log("cookie doesnt exit")
+    } else {
+        // do cookie exists stuff
+        console.log(myCookie)
+         window.location.replace("http://127.0.0.1:5000/answer")
+    }
+}
+
+window.onload = doSomething;
+
+  // document.addEventListener('DOMContentLoaded', () => {
+  //    var cookie =  getCookie("session")
+
+  //    if(cookie != null) {
+  //       window.location.replace("http://127.0.0.1:5000/answer");
+  //    }
+  // })
+
+
+</script>
+
 </html>
+
