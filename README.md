@@ -103,7 +103,7 @@ now create a css folder in the static folder.
 
 - Users can ask questions and receive answers from the chatbot.
 - Chat history is displayed and can be cleared.
-- Users can rate the answers provided by the chatbot, which get stored in the Book1.xlsx file.
+- Users can rate the answers provided by the chatbot, which get stored in the Inventory database.
 
 ## File Structure
 
