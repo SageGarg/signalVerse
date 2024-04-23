@@ -64,15 +64,15 @@ now create a css folder in the static folder.
     Make the database named Inventory and a sheet named store.
     ```bash
     mydb = mysql.connector.connect(
-  host="localhost",
-  user="root",
-  passwd="working@2024",
-  database = "Inventory"
-)
+    host="localhost",
+    user="root",
+    passwd="working@2024",
+    database = "Inventory"
+    )
 
-mycursor = mydb.cursor()
-# mycursor.execute("CREATE DATABASE Inventory")
-# mycursor.execute("CREATE TABLE store (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
+    mycursor = mydb.cursor()
+    mycursor.execute("CREATE DATABASE Inventory")
+    mycursor.execute("CREATE TABLE store (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
     mycursor.execute("CREATE TABLE store (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
     ```
 
