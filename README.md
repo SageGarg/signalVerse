@@ -36,6 +36,8 @@ https://tailwindcss.com/docs/installation
     npx tailwindcss init
     ```
 
+    //node's version has to be greater than 14.0.0
+
     the above commands create a tailwind.config.js file, in that file add the following command:
     content: ["./templates/*"],; this ensures all the html files in the templates folder can use tailwind.
 
@@ -58,12 +60,18 @@ now create a css folder in the static folder.
   and then run the following command in the terminal:
   npm run tailwind
 
+5. Install mySQL: 
+    Make the database named Inventory and a sheet named store.
+
+    Command example: mycursor.execute("CREATE TABLE store (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
+
+
 ### Usage
 
 1. Run the Flask application:
 
     ```bash
-    python main.py
+    python3 main.py
     ```
 
 2. Access the application through a web browser at `trafficsignalverse.com.
