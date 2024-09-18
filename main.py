@@ -6,7 +6,6 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
-
 from langchain.chains import RetrievalQA
 
 #FOR 2nd model
@@ -18,13 +17,14 @@ import mysql.connector
 mydb = mysql.connector.connect(
   host="localhost",
   user="root",
-  passwd="working@2024",
-  database = "Inventory"
+  passwd="Working@2024",
+  database = "Store"
 )
 
 mycursor = mydb.cursor()
-# mycursor.execute("CREATE DATABASE Inventory")
-# mycursor.execute("CREATE TABLE store (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
+mycursor.execute("CREATE DATABASE IF NOT EXISTS Store")
+
+mycursor.execute("CREATE TABLE IF NOT EXISTS data (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
 
 
 
@@ -41,6 +41,18 @@ loader3 = PyPDFLoader("mutcd11thedition.pdf")
 pages3 = loader3.load()
 print("document 3 successfully loaded")
 
+loader4 = PyPDFLoader("ATSPM_Methods_and_Assumptions_4.3.pdf")
+pages4 = loader4.load()
+print("document 4 successfully loaded")
+
+loader5 = PyPDFLoader("ATSPM_User Case Examples_Manual_20200128.pdf")
+pages5 = loader5.load()
+print("document 5 successfully loaded")
+
+loader6 = PyPDFLoader("Performance Measures for Traffic Signal Systems_ An Outcome-Orien.pdf")
+pages6 = loader6.load()
+print("document 6 successfully loaded")
+
 
 text_splitter = CharacterTextSplitter(
     separator="\n",
@@ -49,17 +61,16 @@ text_splitter = CharacterTextSplitter(
     length_function=len
 )
 
-splits = text_splitter.split_documents(pages+pages2 + pages3)
+splits = text_splitter.split_documents(pages)# + pages2 + pages3 + pages4 + pages5 + pages6)
 
-len(pages+pages2 + pages3)
+len(pages + pages2 + pages3 + pages4 + pages5 + pages6)
 
 len(splits)
 
 print("documents splitted")
 
-# pdf_paths = [r"22097.pdf"]
 
-embedding = OpenAIEmbeddings(openai_api_key="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")
+embedding = OpenAIEmbeddings(openai_api_key="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")
 
 persist_directory = 'chroma/stm_brandNew2/'
 
@@ -76,24 +87,35 @@ print(vectordb._collection.count())
 vectordb.persist()
 
 persist_directory = persist_directory
-OpenAIEmbeddings(openai_api_key="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")
+OpenAIEmbeddings(openai_api_key="sk-proj-dRWoPNWJfyQDR4C6E4zkT3BlbkFJ0nT3DB8F8oJmxX0XV2Rm")
 vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
 print(vectordb._collection.count())
 
 # llm2 = OpenAI(model_name="gpt-3.5-turbo-1106", temperature=0)
-llm = ChatOpenAI(model_name='gpt-3.5-turbo-16k-0613', openai_api_key="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",temperature=0)
-
-openai_api_key = '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'
+llm = ChatOpenAI(model_name='gpt-4o',  openai_api_key="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",temperature=0)
+llm2 = ChatOpenAI(model_name='gpt-4o-2024-08-06', openai_api_key="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",temperature=0)
+llm3 = ChatOpenAI(model_name='gpt-4o-2024-05-13', openai_api_key="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",temperature=0)
+openai_api_key = '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'
 os.environ["OPENAI_API_KEY"] = openai_api_key
 client = OpenAI(# defaults to os.environ.get("OPENAI_API_KEY")
 )
 
-qa_chain = RetrievalQA.from_chain_type(
-    llm,
-    retriever=vectordb.as_retriever()
-)
+# qa_chain = RetrievalQA.from_chain_type(
+#     llm,
+#     retriever=vectordb.as_retriever()
+# )
 
-
+def query_with_model(query, use_llm2=False, use_llm3=False):
+    if use_llm2:
+        model = llm2
+    elif use_llm3:
+        model = llm3
+    else:
+        model = llm
+    return RetrievalQA.from_chain_type(
+        llm=model,
+        retriever=vectordb.as_retriever()
+    )
 print("beginning of frontend code")
 
 #####   BEGINNING OF FRONT END CODE #####
@@ -151,16 +173,17 @@ def submit_question():
 @app.route('/result/<user_name>')
 def display_result(user_name):
             ques_input = session["question"]
+            qa_chain = query_with_model("your query", use_llm2=True)
             result = qa_chain({"query": ques_input})
             answer = result["result"]
             # answer = "coming back soon"
             user_name = session["user_name"]
             user_email = session["user_email"]
             
-            prompt = f"In context of traffic signals answer this: {ques_input}\n What is the answer and provide meta data of the answer in the next line:"
+            prompt = f"In context of traffic signals answer this: {ques_input}\n What is the answer and provide meta of the answer in the next line:"
 
             ChipAnswerText = client.chat.completions.create(
-        model="gpt-3.5-turbo-1106",
+        model="gpt-4o",
         messages=[{"role": "user", "content": prompt}]
     )
             # print(ChipAnswerText)
@@ -194,9 +217,9 @@ def rating_submission():
         # print(ChipAnswer)
         # chat_histories[user_email].append({'question': question, 'answer': answer, 'message': message})
         
-        num_row = mycursor.execute("SELECT * FROM store")
+        num_row = mycursor.execute("SELECT * FROM data")
         num_row = len(mycursor.fetchall())
-        sqlFormula = "INSERT INTO store VALUES (%s,%s,%s,%s,%s,%s,%s)"
+        sqlFormula = "INSERT INTO data VALUES (%s,%s,%s,%s,%s,%s,%s)"
         toAppend = (num_row + 1, user_email,question,answer,rating,ChipAnswer,rating2)
         mycursor.execute(sqlFormula,toAppend)
 
