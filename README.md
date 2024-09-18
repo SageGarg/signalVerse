@@ -66,13 +66,13 @@ now create a css folder in the static folder.
     mydb = mysql.connector.connect(
     host="localhost",
     user="root",
-    passwd="working@2024",
-    database = "Inventory"
+    passwd="Working@2024",
+    database = "Store"
     )
 
     mycursor = mydb.cursor()
-    mycursor.execute("CREATE DATABASE Inventory")
-    mycursor.execute("CREATE TABLE store (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
+    mycursor.execute("CREATE DATABASE Store")
+    mycursor.execute("CREATE TABLE data (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
     ```
 
 ### Usage
@@ -111,5 +111,41 @@ now create a css folder in the static folder.
 - `requirements.txt`: Python dependencies.
 - `templates/`: HTML templates for rendering pages.
 - `static/`: Static files including CSS and images.
+
+## Deploying SQL on ec2 instance
+
+### Step 1: Update the system
+
+sudo apt update
+
+### Step 2: Install MySql
+
+sudo apt install mysql-server
+
+### Step 3: Check the Status of MySql (Active or Inactive)
+
+sudo systemctl status mysql
+
+### Step 4: Login to MySql as a root
+
+sudo mysql
+
+### Step 5: Update the password for the MySql Server
+
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'place-your-password-here';
+
+FLUSH PRIVILEGES;
+
+### Step 6: Test the MySql server if it is working by running sample sql queries
+
+CREATE DATABASE mysql_test;
+
+USE mysql_test;
+
+CREATE TABLE table1 (id INT, name VARCHAR(45));
+
+INSERT INTO table1 VALUES(1, 'Virat'), (2, 'Sachin'), (3, 'Dhoni'), (4, 'ABD');
+
+SELECT * FROM table1;
 
 
