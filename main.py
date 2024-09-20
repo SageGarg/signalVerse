@@ -17,7 +17,7 @@ import mysql.connector
 mydb = mysql.connector.connect(
   host="localhost",
   user="root",
-  passwd="Working@2024",
+  passwd="working@2024", #Working@2024 for deployed
   database = "Store"
 )
 
@@ -61,7 +61,7 @@ text_splitter = CharacterTextSplitter(
     length_function=len
 )
 
-splits = text_splitter.split_documents(pages)# + pages2 + pages3 + pages4 + pages5 + pages6)
+splits = text_splitter.split_documents(pages + pages2 + pages3 + pages4 + pages5 + pages6)
 
 len(pages + pages2 + pages3 + pages4 + pages5 + pages6)
 
@@ -87,7 +87,7 @@ print(vectordb._collection.count())
 vectordb.persist()
 
 persist_directory = persist_directory
-OpenAIEmbeddings(openai_api_key="sk-proj-dRWoPNWJfyQDR4C6E4zkT3BlbkFJ0nT3DB8F8oJmxX0XV2Rm")
+OpenAIEmbeddings(openai_api_key="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")
 vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
 print(vectordb._collection.count())
 
