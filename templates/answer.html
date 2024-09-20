@@ -55,7 +55,7 @@
           <div
             style="color:rgb(70, 69, 69); font-family:'Times New Roman', Times, serif;  margin-top: 10px; text-align: justify;"
             class="sm:text-xl">
-            <strong>Question:</strong> {{ entry['question'] }}<br>
+            <strong>Question: {{ entry['question'] }}</strong><br>
           </div>
           <div
             style=" color: #010204; margin-top: 8px;font-family:Georgia, 'Times New Roman', Times, serif;  text-align: justify;"
@@ -79,6 +79,8 @@
               <div id="GFG_DIV_1" class="flex-initial mr-4">
                 <label for="rating1" id="rating-font" class="font-extrabold text-lg">SignalVerse Rating: </label>
                 <select id="rating1" name="rate" required class="block mr-6">
+                  
+                  <option value="" selected>Please select</option>
                   <option value="0">0</option>
                   <option value="1">1</option>
                   <option value="2">2</option>
@@ -92,6 +94,7 @@
                 <label for="rating2" id="rating-font" class="font-extrabold text-lg ml-5">Standard Response Rating:
                 </label>
                 <select id="rating2" name="rate2" required class="block ">
+                  <option value="" selected>Please select</option>
                   <option value="0">0</option>
                   <option value="1">1</option>
                   <option value="2">2</option>
