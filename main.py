@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session,jsonify, redirect, url_for
+from flask import Flask, render_template, request, session, jsonify, redirect, url_for
 import pandas as pd
 from openpyxl import load_workbook
 from langchain_community.document_loaders import PyPDFLoader
@@ -7,71 +7,54 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 from langchain.chains import RetrievalQA
-
-#FOR 2nd model
 import os
 from openai import OpenAI
-
-#FOR mySQL
 import mysql.connector
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Get API keys from .env
+openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key_2 = os.getenv("OPENAI_API_KEY_2")
+openai_api_key_3 = os.getenv("OPENAI_API_KEY_3")
+
+# MySQL connection
 mydb = mysql.connector.connect(
   host="localhost",
   user="root",
-  passwd="working@2024", #Working@2024 for deployed
-  database = "Store"
+  passwd="working@2024",  # Update as needed
+  database="Store"
 )
 
 mycursor = mydb.cursor()
 mycursor.execute("CREATE DATABASE IF NOT EXISTS Store")
+mycursor.execute("CREATE TABLE IF NOT EXISTS data (`Sr. No.` INT, Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
 
-mycursor.execute("CREATE TABLE IF NOT EXISTS data (`Sr. No.` INT,Email_ID VARCHAR(255), Question TEXT, SignalVerse_Answer TEXT, Rating INT, Raw_AI_Response TEXT, Rating2 INT)")
+# Folder path for PDF documents
+folder_path = "dataSet/"
 
+# Dynamically load all PDF files from the folder
+pages = []
+for file_name in os.listdir(folder_path):
+    if file_name.endswith(".pdf"):
+        file_path = os.path.join(folder_path, file_name)
+        loader = PyPDFLoader(file_path)
+        document_pages = loader.load()
+        pages.extend(document_pages)
+        print(f"Document '{file_name}' successfully loaded")
 
-
-
-loader = PyPDFLoader("signal_timing_manual_fhwa.pdf")
-pages = loader.load()
-print("document 1 successfully loaded")
-
-loader2 = PyPDFLoader("22097.pdf")
-pages2 = loader2.load()
-print("document 2 successfully loaded")
-
-loader3 = PyPDFLoader("mutcd11thedition.pdf")
-pages3 = loader3.load()
-print("document 3 successfully loaded")
-
-loader4 = PyPDFLoader("ATSPM_Methods_and_Assumptions_4.3.pdf")
-pages4 = loader4.load()
-print("document 4 successfully loaded")
-
-loader5 = PyPDFLoader("ATSPM_User Case Examples_Manual_20200128.pdf")
-pages5 = loader5.load()
-print("document 5 successfully loaded")
-
-loader6 = PyPDFLoader("Performance Measures for Traffic Signal Systems_ An Outcome-Orien.pdf")
-pages6 = loader6.load()
-print("document 6 successfully loaded")
-
-
+# Split the loaded documents into chunks
 text_splitter = CharacterTextSplitter(
     separator="\n",
     chunk_size=1500,
     chunk_overlap=150,
     length_function=len
 )
+splits = text_splitter.split_documents(pages)
 
-splits = text_splitter.split_documents(pages + pages2 + pages3 + pages4 + pages5 + pages6)
-
-len(pages + pages2 + pages3 + pages4 + pages5 + pages6)
-
-len(splits)
-
-print("documents splitted")
-
-
-embedding = OpenAIEmbeddings(openai_api_key="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")
-
+embedding = OpenAIEmbeddings(openai_api_key=openai_api_key)
 persist_directory = 'chroma/stm_brandNew2/'
 
 vectordb = Chroma.from_documents(
@@ -80,23 +63,17 @@ vectordb = Chroma.from_documents(
     persist_directory=persist_directory
 )
 
-print("chroma created")
-
+print("Chroma created")
 print(vectordb._collection.count())
 
 vectordb.persist()
-
-persist_directory = persist_directory
-OpenAIEmbeddings(openai_api_key="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")
 vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
 print(vectordb._collection.count())
 
-# llm2 = OpenAI(model_name="gpt-3.5-turbo-1106", temperature=0)
-llm = ChatOpenAI(model_name='gpt-4o',  openai_api_key="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",temperature=0)
-llm2 = ChatOpenAI(model_name='gpt-4o-2024-08-06', openai_api_key="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",temperature=0)
-llm3 = ChatOpenAI(model_name='gpt-4o-2024-05-13', openai_api_key="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",temperature=0)
-openai_api_key = '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'
-os.environ["OPENAI_API_KEY"] = openai_api_key
+llm = ChatOpenAI(model_name='gpt-4o', openai_api_key=openai_api_key, temperature=0)
+llm2 = ChatOpenAI(model_name='gpt-4o-2024-08-06', openai_api_key=openai_api_key_2, temperature=0)
+llm3 = ChatOpenAI(model_name='gpt-4o-2024-05-13', openai_api_key=openai_api_key_3, temperature=0)
+
 client = OpenAI(# defaults to os.environ.get("OPENAI_API_KEY")
 )
 
