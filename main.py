@@ -82,13 +82,15 @@ client = OpenAI(# defaults to os.environ.get("OPENAI_API_KEY")
 #     retriever=vectordb.as_retriever()
 # )
 
-def query_with_model(query, use_llm2=False, use_llm3=False):
+def query_with_model(query, use_llm2=True, use_llm3=False):
     if use_llm2:
         model = llm2
+        print("using august model")
     elif use_llm3:
         model = llm3
     else:
         model = llm
+        print("using the 4-o model")
     return RetrievalQA.from_chain_type(
         llm=model,
         retriever=vectordb.as_retriever()
