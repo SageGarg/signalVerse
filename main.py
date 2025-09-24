@@ -28,7 +28,7 @@ kw_model = KeyBERT(model="all-MiniLM-L6-v2")
 mydb = mysql.connector.connect(
   host="localhost",
   user="root",
-  passwd="hello@123", # working@2024 for local and Working@2024
+  passwd="Working@2024", # working@2024 for local and Working@2024
   database="Store"
 )
 
@@ -39,7 +39,7 @@ mycursor.execute("CREATE TABLE IF NOT EXISTS data (`Sr. No.` INT, Email_ID VARCH
 mydb_bdib = mysql.connector.connect(
   host="localhost",
   user="root",
-  passwd="hello@123", # working@2024 for local and Working@2024
+  passwd="Working@2024", # working@2024 for local and Working@2024
   database="Store_bdib"
 )
 
@@ -50,7 +50,7 @@ mycursor_bdib.execute("CREATE TABLE IF NOT EXISTS data (`Sr. No.` INT, Email_ID 
 mydb_nchrp = mysql.connector.connect(
     host="localhost",
     user="root",
-    passwd="hello@123",  # working@2024 for local and Working@2024
+    passwd="Working@2024",  # working@2024 for local and Working@2024
     database="Store_nchrp"
 )
 
@@ -68,7 +68,7 @@ load_dotenv()
 # Datasets and their base directories
 DATASETS = {
     "signalVerse": "dataSet",
-    "bdib": "data2",
+    "bdib": "Data",
     "nchrp": "nchrp_data"
 }
 
@@ -160,6 +160,7 @@ def extract_keywords(text, top_k=5):
 def answer_question(question, vectorstore, chat_history=None):
     retriever = vectorstore.as_retriever(search_kwargs={"k": 6})
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
     if chat_history is None:
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
@@ -182,14 +183,21 @@ def answer_question(question, vectorstore, chat_history=None):
 
     sources = response.get("source_documents", [])
 
-    # Build metadata string
+    # Build metadata string with page numbers
     metadata_info = []
     for doc in sources:
         src = doc.metadata.get("source", "Unknown file")
-        metadata_info.append(src)
+        page = doc.metadata.get("page", None)
+        if page is not None:
+            metadata_info.append(f"{os.path.basename(src)} (page {page+1})")  
+            # page is usually zero-indexed, so +1
+        else:
+            metadata_info.append(os.path.basename(src))
+
     metadata_text = "\nSources:\n" + "\n".join(set(metadata_info)) if metadata_info else ""
 
     return answer + "\n\n" + metadata_text, sources
+
 
 
 
