@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NCHRP Options</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+    <style>
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #f7f9fb;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      h1 {
+        margin-top: 60px;
+        font-size: 2rem;
+        color: #2c3e50;
+      }
+
+      p {
+        color: #555;
+        margin-bottom: 40px;
+        font-size: 1.1rem;
+      }
+
+      .card-container {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        flex-wrap: wrap;
+      }
+
+      .card {
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+        width: 320px;
+        padding: 25px 20px 35px 20px;
+        text-align: center;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+      }
+
+      .card img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+        border-radius: 12px;
+        margin-bottom: 18px;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+
+      .card:hover img {
+        transform: scale(1.03);
+        box-shadow: 0 0 10px rgba(26, 115, 232, 0.3);
+      }
+
+      .card h3 {
+        margin-bottom: 12px;
+        color: #1a237e;
+        font-size: 1.3rem;
+      }
+
+      .card p {
+        font-size: 0.95rem;
+        color: #666;
+        margin-bottom: 25px;
+      }
+
+      .btn {
+        background-color: #1a73e8;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 18px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.25s ease;
+      }
+
+      .btn:hover {
+        background-color: #0b57cf;
+      }
+
+      footer {
+        margin-top: auto;
+        padding: 25px;
+        color: #999;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Welcome, {{ user_name }}!</h1>
+    <p>User Type: {{ user_role }}</p>
+
+    <p>Please choose one of the following options:</p>
+
+    <div class="card-container">
+      <div class="card">
+        <img
+          src="{{ url_for('static', filename='/Image/chatbot.jpg') }}"
+          alt="Traffic Sensor Clearinghouse"
+        />
+        <h3>🤖 Traffic Sensor Clearinghouse</h3>
+        <p>
+          Chat with the AI-powered assistant to access both document-based and
+          open-source traffic sensor insights
+        </p>
+        <form
+          action="{{ url_for('nchrp_bp.go_to_clearinghouse') }}"
+          method="get"
+        >
+          <button type="submit" class="btn">Open Chatbot</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <img
+          src="{{ url_for('static', filename='/Image/reports.jpg') }}"
+          alt="Reports Section"
+        />
+        <h3>📊 Sensor Test Results</h3>
+        <p>
+          Browse detailed test reports by state, year, and sensor type,
+          featuring parsed NCHRP Stage 1 results.
+        </p>
+        <form action="{{ url_for('nchrp_bp.testSampleReport') }}" method="get">
+          <button type="submit" class="btn">View Reports</button>
+        </form>
+      </div>
+    </div>
+
+    <footer>© 2025 NCHRP | Developed for Traffic SignalVerse</footer>
+  </body>
+</html>

@@ -8,9 +8,9 @@
     <link
       href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400..700&family=Madimi+One&family=Marhey:wght@616&display=swap"
       rel="stylesheet">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='/Image/favico.png') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='/Image/leaves2.png') }}">
     <!-- <script src="https://cdn.tailwindcss.com"></script> -->
-    <title>SignalVerse</title>
+    <title>BDiB</title>
 
     <style>
       body {
@@ -27,15 +27,15 @@
     <div class="flex flex-col justify-between bg-orange-50">
       <header class="fixed  left-0 right-0 bg-orange-50 ">
         <div class="flex items-center justify-between px-2 py-2">
-          <a href="/">
-            <img src="{{url_for('static', filename='/Image/Logo.png')}}" alt="image" class="w-24 h-28 sm:w-40 sm:h-40">
+          <a href="/bdib_bp">
+            <img src="{{url_for('static', filename='/Image/bdib_logo.png')}}" alt="image" class="w-40 h-28 sm:w-40 sm:h-36">
           </a>
 
           <div class="flex items-center">
 
-            <img src="{{url_for('static', filename='/Image/lights.png')}}" alt="image"
+            <img src="{{url_for('static', filename='/Image/leave.png')}}" alt="image"
               class="hidden sm:block  sm:w-15 sm:h-8 md:h-12">
-            <h1 class=" text-3xl sm:text-4xl md:text-6xl font-bold pr-0">SignalVerse</h1>
+            <h1 class=" text-3xl sm:text-4xl md:text-6xl font-bold pr-0">BDiB</h1>
           </div>
 
           <button
@@ -68,16 +68,17 @@
           
           <strong>Raw AI Response:</strong> {{entry['ChipAnswer']}}
           </div>
-          
+
+
 
           </p>
 
           <!-- <hr style="height: 3px; background: green;"> -->
           {% endfor %}
-          <form action="{{ url_for('rating_submission') }}" method="post" class=" mt-2" id="ratingForm">
+          <form action="{{ url_for('bdib_bp.rating_submission_bdib') }}" method="post" class=" mt-2" id="ratingForm">
             <div class="flex">
               <div id="GFG_DIV_1" class="flex-initial mr-4">
-                <label for="rating1" id="rating-font" class="font-extrabold text-lg">SignalVerse Rating: </label>
+                <label for="rating1" id="rating-font" class="font-extrabold text-lg">BDiB Answer Rating: </label>
                 <select id="rating1" name="rate" required class="block mr-6">
                   
                   <option value="" selected>Please select</option>
@@ -91,7 +92,7 @@
               </div>
               &nbsp &nbsp &nbsp
               <div id="GFG_DIV_2" class="flex-initial">
-                <label for="rating2" id="rating-font" class="font-extrabold text-lg ml-5">Standard Response Rating:
+                <label for="rating2" id="rating-font" class="font-extrabold text-lg ml-5">Raw AI Response Rating:
                 </label>
                 <select id="rating2" name="rate2" required class="block ">
                   <option value="" selected>Please select</option>
@@ -122,7 +123,7 @@
       <footer
         class="h-28 bg-orange-50 flex justify-between border-4 border-black mx-3 my-1 rounded-md fixed bottom-0 left-0 right-0">
 
-        <form action="{{ url_for('submit_question') }}" method="post" class="flex-grow">
+        <form action="{{ url_for('bdib_bp.submit_question_bdib') }}" method="post" class="flex-grow">
           <div class="mt-2"> <!-- Added flex-grow class -->
             <label for="user_input" class="ml-6 font-extrabold py-6" id="question-font">Type your question here:</label>
           </div>

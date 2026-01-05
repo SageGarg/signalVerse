@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="/static/css/output.css" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400..700&family=Madimi+One&family=Marhey:wght@616&display=swap"
+    rel="stylesheet">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='/Image/leaves2.png') }}">
+  <title>nchrp</title>
+
+  <style>
+    body {
+      font-family: Kode Mono;
+    }
+
+    #user_input {
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    
+  #loadingSpinner {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    color: #333;
+  }
+
+
+  </style>
+</head>
+
+<body class="bg-slate-600">
+  <div class="flex flex-col justify-between bg-slate-600">
+    <header class="fixed left-0 right-0 bg-slate-600">
+      <div class="flex items-center justify-between px-2 py-2">
+        <a href="/nchrp_bp">
+          <img src="{{url_for('static', filename='/Image/bus.png')}}" alt="image"
+            class=" sm:w-16 sm:h-10 md:h-12">
+        </a>
+
+        <div class="flex items-center">
+          <!-- <img src="{{url_for('static', filename='/Image/bus.png')}}" alt="image"
+            class="hidden sm:block sm:w-15 sm:h-8 md:h-12"> -->
+          <h1 class="text-3xl sm:text-4xl md:text-6xl font-bold pr-0"> Traffic Sensor Clearinghouse</h1>
+        </div>
+
+        <button
+          class="bg-white border-2 font-bold border-black sm:px-3 sm:py-2 ml-3 leading-tight px-1 hover:bg-green-700 rounded-2xl"
+          onclick="ClearFields()">New Chat</button>
+
+      </div>
+    </header>
+
+    <div class="mt-28 sm:mt-40">
+      <main class="mx-10 sm:mx-20 text-justify mb-40" id="the_content">
+        {% if chat_history %}
+        {% for entry in chat_history %}
+        <br>
+        <hr style="height: 3px; background: rgb(60, 168, 60);">
+        <p style="color:#2980b9; font-family:'Courier New', Courier, monospace;">
+        <div style="color:rgb(70, 69, 69); font-family:'Times New Roman', Times, serif; margin-top: 10px;"
+          class="sm:text-xl">
+          <strong>Question: {{ entry['question'] }}</strong><br>
+        </div>
+        <div style="color:#010204; margin-top: 8px; font-family:Georgia, 'Times New Roman', Times, serif;"
+          class="font-medium sm:text-xl">
+          <!-- <strong>Answer:</strong> {{ entry['answer'] }}<br> -->
+        </div>
+
+        <div style="color:#010204; margin-top: 8px; font-family:Georgia, 'Times New Roman', Times, serif;"
+  class="font-medium sm:text-xl">
+  <strong>Answer:</strong>
+  <pre style="white-space: pre-wrap; font-family: inherit; background-color: #fff9ed; padding: 0.5rem; border-radius: 0.5rem;">{{ entry['answer'] }}</pre>
+</div>
+
+        <div style="color:#010204; margin-top: 8px; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;"
+          class="font-medium sm:text-xl">
+          <strong>Raw AI Response:</strong> {{entry['ChipAnswer']}}
+        </div>
+        </p>
+        {% endfor %}
+
+        <form action="{{ url_for('nchrp_bp.rating_submission_nchrp') }}" method="post" class="mt-2" id="ratingForm">
+          <div class="flex">
+            <div class="flex-initial mr-4">
+              <label for="rating1" class="font-extrabold text-lg">Answer Rating:</label>
+              <select id="rating1" name="rate" required class="block mr-6">
+                <option value="" selected>Please select</option>
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+
+            <div class="flex-initial">
+              <label for="rating2" class="font-extrabold text-lg ml-5">Raw AI Response Rating:</label>
+              <select id="rating2" name="rate2" required class="block">
+                <option value="" selected>Please select</option>
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="submitBtn"
+            class="bg-white border-2 font-extrabold border-black px-1 sm:px-3 leading-tight text-sm sm:text-base hover:bg-green-700 rounded-full flex-initial"
+            onclick="notification()">Submit</button>
+        </form>
+
+        {% endif %}
+      </main>
+    </div>
+
+    <div id="loadingSpinner">⏳ Getting your answer...</div>
+
+
+    <footer
+      class="h-28 bg-slate-600 flex justify-between border-4 border-black mx-3 my-1 rounded-md fixed bottom-0 left-0 right-0">
+      <form action="{{ url_for('nchrp_bp.submit_question_nchrp') }}" method="post" class="flex-grow">
+        <div class="mt-2">
+          <label for="user_input" class="ml-6 font-extrabold py-6">Type your question here:</label>
+        </div>
+        <div class="flex">
+          <input type="text" required id="user_input" name="quesInput" autocomplete="on" placeholder="Type here:"
+            class="ml-5 flex-grow py-1 px-4 m-2 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500">
+          <button type="submit" value="Submit"
+            class="bg-white border-2 border-black h-fit mr-3 p-1 mt-2 hover:bg-green-700">
+            <img src="{{url_for('static', filename='/Image/arrow.png')}}" alt="image" class="w-6 h-6">
+          </button>
+        </div>
+      </form>
+    </footer>
+  </div>
+
+  <script>
+  function notification() {
+    alert("Rating has been submitted.");
+  }
+
+  function ClearFields() {
+    document.getElementById("the_content").innerHTML = "";
+    fetch('/clear_chat_history', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    })
+      .then(response => response.json())
+      .then(data => console.log(data))
+      .catch(error => console.error('Error:', error));
+  }
+
+  function scrollToBottom() {
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+
+  window.onload = function () {
+    scrollToBottom();
+  };
+
+  const form = document.querySelector("footer form");
+  const spinner = document.getElementById("loadingSpinner");
+
+  form.addEventListener("submit", function () {
+    scrollToBottom();
+    if (spinner) {
+      spinner.style.display = "block";
+    }
+  });
+
+  
+  document.getElementById("viewReportsBtn").addEventListener("click", () => {
+    window.location.href = "{{ url_for('nchrp_bp.testSampleReport') }}";
+  });
+
+</script>
+
+
+</body>
+
+</html>

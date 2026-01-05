@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nchrp - Home Page</title>
+    <link
+      rel="shortcut icon"
+      href="{{ url_for('static', filename='/Image/leaves2.png') }}"
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400..700&family=Madimi+One&family=Marhey:wght@616&display=swap"
+      rel="stylesheet"
+    />
+
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{{ url_for('static',filename='styles/style_ipers.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Merriweather:wght@400;700&display=swap"
+    />
+  </head>
+
+  <style>
+    .flash-popup {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ff4d4d;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      z-index: 2000;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      animation: fadeOut 3s ease forwards;
+    }
+
+    @keyframes fadeOut {
+      0% {
+        opacity: 1;
+      }
+      70% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+  </style>
+
+  <body>
+    {% with messages = get_flashed_messages() %} {% if messages %}
+    <div class="flash-popup">{{ messages[0] }}</div>
+    {% endif %} {% endwith %}
+
+    <div id="particles-js"></div>
+    <script src="{{url_for('static', filename='styles/particles.js')}}"></script>
+    <script src="{{url_for('static', filename='styles/app.js')}}"></script>
+
+    <h1>Traffic Sensor Clearinghouse</h1>
+
+    <div class="taking_input">
+      <form action="{{ url_for('nchrp_bp.answer_nchrp') }}" method="post">
+        <p
+          style="
+            font-family: 'Kode Mono', monospace;
+            font-weight: bolder;
+            font-size: larger;
+            text-align: left;
+          "
+        >
+          Name:
+        </p>
+        <p>
+          <input
+            type="text"
+            placeholder="Enter your name here:"
+            name="user_question"
+            required
+          />
+        </p>
+        <p
+          style="
+            font-family: 'Kode Mono', monospace;
+            font-weight: bolder;
+            font-size: larger;
+            text-align: left;
+          "
+        >
+          E-mail:
+        </p>
+        <p>
+          <input
+            type="email"
+            placeholder="Enter your e-mail here:"
+            name="user_email"
+            required
+          />
+        </p>
+        <p
+          style="
+            font-family: 'Kode Mono', monospace;
+            font-weight: bolder;
+            font-size: larger;
+            text-align: left;
+          "
+        >
+          User Type:
+        </p>
+
+        <p>
+          <select name="user_role" required>
+            <option value="">Select User Role</option>
+            <option value="public">Public User</option>
+            <option value="state_dot">State DOT</option>
+            <option value="testing_facility">Testing Facility</option>
+            <option value="manufacturer">Manufacturer</option>
+            <option value="admin">Clearinghouse Admin</option>
+          </select>
+        </p>
+
+        <p><input type="submit" value="Submit" class="submit_button" /></p>
+      </form>
+    </div>
+
+    <!-- Pop-up Button -->
+    <div class="popup-container">
+      <button class="open-popup" onclick="togglePopup()">
+        <img
+          src="{{ url_for('static', filename='Image/question.png') }}"
+          alt="About"
+          class="popup-icon"
+        />
+      </button>
+      <div class="popup-content" id="popup">
+        <span class="close-popup" onclick="togglePopup()">&times;</span>
+        <h3>About Me</h3>
+        <p>
+          I am your AI assistant, here to answer questions for the nchrp team.
+        </p>
+      </div>
+    </div>
+  </body>
+
+  <script>
+    function togglePopup() {
+      var popup = document.getElementById("popup");
+      if (popup.style.display === "block") {
+        popup.style.display = "none";
+      } else {
+        popup.style.display = "block";
+      }
+    }
+
+    function cookieExists(name) {
+      return document.cookie
+        .split(";")
+        .some((cookie) => cookie.trim().startsWith(name + "="));
+    }
+
+    function doSomething() {
+      var myCookie = cookieExists("isloggedin");
+
+      if (!myCookie) {
+        console.log("cookie doesn't exist");
+      } else {
+        console.log(myCookie);
+        window.location.replace("http://127.0.0.1:5000/nchrp_bp/answer_nchrp");
+      }
+    }
+
+    window.onload = doSomething;
+  </script>
+</html>

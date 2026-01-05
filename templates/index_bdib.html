@@ -4,8 +4,8 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SignalVerse - Home Page</title>
-    <link rel="shortcut icon" href="{{ url_for('static', filename='/Image/favico.png') }}">
+    <title>BDiB - Home Page</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='/Image/leaves2.png') }}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,8 @@
       href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400..700&family=Madimi+One&family=Marhey:wght@616&display=swap"
       rel="stylesheet">
 
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/style.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/style_bdib.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Merriweather:wght@400;700&display=swap">
     
 
   </head>
@@ -23,10 +24,9 @@
     <script src="{{url_for('static', filename='styles/particles.js')}}"></script>
     <script src="{{url_for('static', filename='styles/app.js')}}"></script>
 
-    <h1 >SignalVerse</h1>
-    <div class="container">
+    <h1 >BDiB</h1>
   <div class="taking_input">
-    <form action="/answer" method="post">
+    <form action="{{ url_for('bdib_bp.answer_bdib') }}" method="post">
       <p style="font-family: 'Kode Mono', monospace; font-weight: bolder; font-size: larger; text-align: left;">
         Name:
       </p>
@@ -37,17 +37,29 @@
       <p><input type="email" placeholder="Enter your e-mail here:" name="user_email" required /></p>
       <p><input type="submit" value="Submit" class="submit_button" /></p>
     </form>
-  </div>
-
-  <!-- <div class="description">
-    Effortlessly uncover accurate traffic engineering insights—ask questions and get answers from multiple documents without the hassle of manual searches.
-  </div> -->
 </div>
 
+    <!-- Pop-up Button -->
+<div class="popup-container">
+  <button class="open-popup" onclick="togglePopup()"><img src="{{ url_for('static', filename='Image/question.png') }}" alt="About" class="popup-icon">
+  </button>
+  <div class="popup-content" id="popup">
+    <span class="close-popup" onclick="togglePopup()">&times;</span>
+    <h3>About Me</h3>
+    <p>I am your AI assistant, here to offer insightful answers to your questions about organic farming.</p>
+  </div>
+</div>
   </body>
 
 <script>
-
+    function togglePopup() {
+  var popup = document.getElementById("popup");
+  if (popup.style.display === "block") {
+    popup.style.display = "none";
+  } else {
+    popup.style.display = "block";
+  }
+}
     
   function cookieExists(name) {
     return document.cookie.split(';').some(cookie => cookie.trim().startsWith(name + '='));
@@ -64,7 +76,7 @@ function doSomething() {
     } else {
         // do cookie exists stuff
         console.log(myCookie)
-         window.location.replace("http://127.0.0.1:5000/answer")
+         window.location.replace("http://127.0.0.1:5000/bdib_bp/answer_bdib")
     }
 }
 
