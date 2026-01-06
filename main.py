@@ -890,6 +890,15 @@ def load_nchrp_from_files():
 
     return tests, metrics_by_key
 
+from flask import send_from_directory
+
+@nchrp_bp.route("/download-template")
+def download_template():
+    return send_from_directory(
+        directory=os.path.join(current_app.root_path, "sampleData"),
+        path="template.csv",
+        as_attachment=True
+    )
 
 
 @nchrp_bp.route("/")
@@ -1047,46 +1056,66 @@ def testSampleReport():
     )
 
 
+from flask import request, redirect, url_for, flash, current_app
+from werkzeug.utils import secure_filename
+import os
+import time
 
+ALLOWED_REPORT_EXT = {".xlsx", ".csv"}
+# metadata can be “any form” — we still should restrict to safe-ish common types
+ALLOWED_META_EXT = {
+    ".pdf", ".doc", ".docx", ".txt",
+    ".png", ".jpg", ".jpeg", ".webp",
+    ".csv", ".xlsx"
+}
 
-
+def _ext(name: str) -> str:
+    return os.path.splitext(name)[1].lower()
 
 @nchrp_bp.route("/upload_report", methods=["POST"])
 def upload_report():
-    if session.get("user_role") == "public":
-        flash("You do not have permission to upload reports.")
+    sample_dir = os.path.join(current_app.root_path, "sampleData")
+    upload_dir = os.path.join(current_app.root_path, "uploads")
+    meta_dir = os.path.join(upload_dir, "metadata")
+
+    os.makedirs(sample_dir, exist_ok=True)
+    os.makedirs(upload_dir, exist_ok=True)
+    os.makedirs(meta_dir, exist_ok=True)
+
+    report = request.files.get("report_file")
+    meta = request.files.get("metadata_file")
+
+    # --- required report file ---
+    if not report or not report.filename:
+        flash("Please upload the completed template file (.xlsx or .csv).")
         return redirect(url_for("nchrp_bp.testSampleReport"))
 
-    uploaded_file = request.files.get("pdf_file")  # keep field name to avoid changing HTML form right now
-    if not uploaded_file:
-        flash("No file uploaded.")
+    report_name = secure_filename(report.filename)
+    if _ext(report_name) not in ALLOWED_REPORT_EXT:
+        flash("Report file must be .xlsx or .csv.")
         return redirect(url_for("nchrp_bp.testSampleReport"))
 
-    filename = secure_filename(uploaded_file.filename or "")
-    ext = os.path.splitext(filename)[1].lower()
+    # Save report into sampleData (so it shows on the report page)
+    report_path = os.path.join(sample_dir, report_name)
+    report.save(report_path)
 
-    if ext not in [".xlsx", ".csv"]:
-        flash("Upload failed: Please upload an Excel (.xlsx) or CSV (.csv) file.")
-        return redirect(url_for("nchrp_bp.testSampleReport"))
+    # --- optional metadata file ---
+    if meta and meta.filename:
+        meta_name = secure_filename(meta.filename)
+        if _ext(meta_name) not in ALLOWED_META_EXT:
+            flash("Metadata file type not supported. Try PDF/DOC/DOCX/TXT/Images.")
+            return redirect(url_for("nchrp_bp.testSampleReport"))
 
-    # Save into DATA_DIR (source of truth)
-    save_path = os.path.join(DATA_DIR, filename)
-    uploaded_file.save(save_path)
+        # store with timestamp to avoid overwriting
+        ts = time.strftime("%Y%m%d-%H%M%S")
+        meta_path = os.path.join(meta_dir, f"{ts}__{meta_name}")
+        meta.save(meta_path)
 
-    # Validate quickly by attempting to load (so bad files are rejected immediately)
-    try:
-        load_nchrp_from_files()
-    except Exception as e:
-        # rollback the bad file
-        try:
-            os.remove(save_path)
-        except Exception:
-            pass
-        flash(f"Upload failed: {e}")
-        return redirect(url_for("nchrp_bp.testSampleReport"))
-
-    flash("Report file uploaded successfully!")
+    flash("Upload successful!")
     return redirect(url_for("nchrp_bp.testSampleReport"))
+
+
+
 
 # app/nchrp_ai.py
 # Fully working multi-Excel + multi-sheet Ask AI endpoint
