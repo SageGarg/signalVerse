@@ -88,6 +88,114 @@
   </head>
 
   <body>
+    <!-- Upload Modal (PUT THIS INSIDE <body>) -->
+    <div
+      id="uploadModal"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 9999;
+        padding: 30px;
+      "
+    >
+      <div
+        style="
+          background: #fff;
+          max-width: 720px;
+          margin: 40px auto;
+          border-radius: 12px;
+          padding: 18px 18px 14px 18px;
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+        "
+      >
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+          "
+        >
+          <h3 style="margin: 0">Upload a Report</h3>
+          <button
+            type="button"
+            onclick="closeUploadModal()"
+            style="background: #6c757d"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style="margin-top: 10px; line-height: 1.35">
+          <p style="margin: 8px 0">
+            1) Download the template, fill it out, then upload it below.
+          </p>
+
+          <a
+            href="{{ url_for('nchrp_bp.download_template') }}"
+            style="
+              display: inline-block;
+              background: #6c757d;
+              color: #fff;
+              padding: 8px 12px;
+              border-radius: 8px;
+              text-decoration: none;
+              font-weight: 600;
+            "
+          >
+            Download Template
+          </a>
+
+          <hr
+            style="margin: 14px 0; border: none; border-top: 1px solid #eee"
+          />
+
+          <!-- ✅ THIS FORM TAG WAS MISSING -->
+          <form
+            action="{{ url_for('nchrp_bp.upload_report') }}"
+            method="POST"
+            enctype="multipart/form-data"
+          >
+            <div style="margin-bottom: 12px">
+              <label style="font-weight: 700">Template file (required)</label
+              ><br />
+              <input
+                type="file"
+                name="report_file"
+                accept=".xlsx,.csv"
+                required
+              />
+              <div class="muted">Accepted: .xlsx or .csv</div>
+            </div>
+
+            <div style="margin-bottom: 12px">
+              <label style="font-weight: 700">Metadata file (optional)</label
+              ><br />
+              <input
+                type="file"
+                name="metadata_file"
+                accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp,.csv,.xlsx"
+              />
+              <div class="muted">Optional: PDF/DOC/DOCX/TXT/Images/etc.</div>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end">
+              <button
+                type="button"
+                onclick="closeUploadModal()"
+                style="background: #dc3545"
+              >
+                Cancel
+              </button>
+              <button type="submit" style="background: #28a745">Upload</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     {% with messages = get_flashed_messages() %} {% if messages %}
     <div
       style="
@@ -128,44 +236,29 @@
       "
     >
       <!-- Download Template CSV button -->
-      <button
-        type="button"
-        onclick="downloadTemplateCSV()"
+      <a
+        href="{{ url_for('nchrp_bp.download_template') }}"
         style="
           background: #6c757d;
           padding: 6px 14px;
           border-radius: 6px;
           color: white;
-          border: none;
-          cursor: pointer;
+          text-decoration: none;
+          font-weight: bold;
         "
       >
         Download Template CSV
-      </button>
+      </a>
 
       <!-- Upload Button -->
-      <form
-        action="{{ url_for('nchrp_bp.upload_report') }}"
-        method="POST"
-        enctype="multipart/form-data"
-        style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"
+      <button
+        type="button"
+        onclick="openUploadModal()"
+        style="background: #1a73e8"
       >
-        <label for="pdf_file" style="font-weight: bold"
-          >Upload Excel/CSV:</label
-        >
-        <input
-          type="file"
-          id="pdf_file"
-          name="pdf_file"
-          accept=".xlsx,.csv"
-          required
-        />
-
-        <button type="submit" class="btn" style="background: #1a73e8">
-          Upload
-        </button>
-        <span class="muted">(.xlsx or .csv)</span>
-      </form>
+        Upload Report
+      </button>
+      <span class="muted">Fill the template, then upload.</span>
 
       <!-- Download CSV button -->
       <button
@@ -260,7 +353,7 @@
             class="summary-row"
             data-filtered="visible"
             data-test-id="{{ test['Test ID'] }}"
-            data-metrics='{{ (metrics.get((test["Test ID"] ~ ""), [])) | tojson }}'
+            data-key="{{ test['__key__'] }}"
           >
             <td>{{ test["Test ID"] }}</td>
             <td>{{ test["Vendor Name"] }}</td>
@@ -318,6 +411,12 @@
                   <thead>
                     <tr>
                       <th style="padding: 8px; border: 1px solid #ddd">
+                        Sensor Function
+                      </th>
+                      <th style="padding: 8px; border: 1px solid #ddd">
+                        Performance Measure
+                      </th>
+                      <th style="padding: 8px; border: 1px solid #ddd">
                         Measured value (%)
                       </th>
                       <th style="padding: 8px; border: 1px solid #ddd">
@@ -334,30 +433,7 @@
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr>
-                      <td
-                        class="mv"
-                        style="padding: 8px; border: 1px solid #ddd"
-                      ></td>
-                      <td
-                        class="ss"
-                        style="padding: 8px; border: 1px solid #ddd"
-                      ></td>
-                      <td
-                        class="wf"
-                        style="padding: 8px; border: 1px solid #ddd"
-                      ></td>
-                      <td
-                        class="li"
-                        style="padding: 8px; border: 1px solid #ddd"
-                      ></td>
-                      <td
-                        class="tn"
-                        style="padding: 8px; border: 1px solid #ddd"
-                      ></td>
-                    </tr>
-                  </tbody>
+                  <tbody class="detail-tbody"></tbody>
                 </table>
               </div>
             </td>
@@ -560,6 +636,19 @@
         document.body.removeChild(link);
       }
     </script>
+    <script>
+      function openUploadModal() {
+        document.getElementById("uploadModal").style.display = "block";
+      }
+      function closeUploadModal() {
+        document.getElementById("uploadModal").style.display = "none";
+      }
+      // close when clicking backdrop
+      document.addEventListener("click", (e) => {
+        const modal = document.getElementById("uploadModal");
+        if (modal && e.target === modal) closeUploadModal();
+      });
+    </script>
 
     <script>
       // ----------------------------
@@ -715,21 +804,7 @@
     </script>
 
     <script>
-      // ----------------------------
-      // Template CSV download (headers only)
-      // ----------------------------
-      function downloadTemplateCSV() {
-        const columns = {{ column_headers | tojson }};
-        const csv = [columns.map(csvEscape).join(",")];
-
-        const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "template.csv";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
+      window.METRICS_BY_KEY = {{ metrics | tojson }};
     </script>
 
     <script>
@@ -739,7 +814,9 @@
       function safeParseJson(str) {
         try {
           return JSON.parse(str || "[]");
-        } catch {
+        } catch (e) {
+          console.error("metrics JSON parse failed:", e);
+          console.error("metrics raw:", (str || "").slice(0, 300));
           return [];
         }
       }
@@ -756,8 +833,14 @@
         );
       }
 
-      function setOptions(selectEl, options) {
+      function setOptions(selectEl, options, includeAll = true) {
         selectEl.innerHTML = '<option value="">Select…</option>';
+        if (includeAll) {
+          const a = document.createElement("option");
+          a.value = "__ALL__";
+          a.textContent = "All";
+          selectEl.appendChild(a);
+        }
         options.forEach((opt) => {
           const o = document.createElement("option");
           o.value = opt;
@@ -773,7 +856,11 @@
 
         summaryRows.forEach((summaryRow) => {
           const detailRow = summaryRow.nextElementSibling;
-          const metrics = safeParseJson(summaryRow.dataset.metrics);
+          const key = summaryRow.dataset.key || "";
+          const metrics =
+            window.METRICS_BY_KEY && window.METRICS_BY_KEY[key]
+              ? window.METRICS_BY_KEY[key]
+              : [];
 
           const funcSel = summaryRow.querySelector(".sensorFunctionSelect");
           const perfSel = summaryRow.querySelector(".performanceMeasureSelect");
@@ -786,23 +873,29 @@
           funcSel.addEventListener("change", () => {
             const func = funcSel.value;
 
-            const measures = uniq(
-              metrics
-                .filter(
-                  (m) => String(m["Sensor Function"] || "").trim() === func
-                )
-                .map((m) => m["Performance Measure"])
-            );
+            let filtered = metrics;
 
-            setOptions(perfSel, measures);
+            // if a specific function selected, filter
+            if (func && func !== "__ALL__") {
+              filtered = metrics.filter(
+                (m) => String(m["Sensor Function"] || "").trim() === func
+              );
+            }
+
+            const measures = uniq(
+              filtered.map((m) => m["Performance Measure"])
+            );
+            setOptions(perfSel, measures, true);
+
             perfSel.disabled = measures.length === 0;
-            viewBtn.disabled = true;
+            viewBtn.disabled = false; // enable even if "All" selected
 
             if (detailRow) detailRow.style.display = "none";
             viewBtn.textContent = "View";
           });
 
           perfSel.addEventListener("change", () => {
+            // enable View if either a measure chosen or "All"
             viewBtn.disabled = !perfSel.value;
             if (detailRow) detailRow.style.display = "none";
             viewBtn.textContent = "View";
@@ -811,6 +904,8 @@
           viewBtn.addEventListener("click", () => {
             const func = funcSel.value;
             const measure = perfSel.value;
+
+            // require at least something selected
             if (!func || !measure) return;
 
             const isOpen = detailRow.style.display !== "none";
@@ -820,31 +915,70 @@
               return;
             }
 
-            // Find metric row matching selection
-            const row = metrics.find(
-              (m) =>
-                String(m["Sensor Function"] || "").trim() === func &&
-                String(m["Performance Measure"] || "").trim() === measure
-            );
+            // Filter rows based on selections
+            let rowsToShow = metrics;
+
+            if (func !== "__ALL__") {
+              rowsToShow = rowsToShow.filter(
+                (m) => String(m["Sensor Function"] || "").trim() === func
+              );
+            }
+
+            if (measure !== "__ALL__") {
+              rowsToShow = rowsToShow.filter(
+                (m) => String(m["Performance Measure"] || "").trim() === measure
+              );
+            }
+
+            // Update title
+            const titleFunc =
+              func === "__ALL__" ? "All Sensor Functions" : func;
+            const titleMeas = measure === "__ALL__" ? "All Measures" : measure;
 
             const box = detailRow.querySelector(".detail-box");
             box.querySelector(
               ".detail-title"
-            ).textContent = `${func} → ${measure}`;
+            ).textContent = `${titleFunc} → ${titleMeas}`;
 
-            box.querySelector(".mv").textContent =
-              row?.["Measured value (%)"] ?? "";
-            box.querySelector(".ss").textContent = row?.["Sample size"] ?? "";
-            box.querySelector(".wf").textContent = row?.["Weather (F)"] ?? "";
-            box.querySelector(".li").textContent = row?.["Lighting"] ?? "";
-            box.querySelector(".tn").textContent =
-              row?.["Testing Notes (optional)"] ?? "";
+            // Render table rows
+            const tbody = detailRow.querySelector(".detail-tbody");
+            tbody.innerHTML = "";
+
+            if (!rowsToShow.length) {
+              tbody.innerHTML = `<tr><td colspan="5" style="padding:8px;">No rows found.</td></tr>`;
+            } else {
+              rowsToShow.forEach((r) => {
+                const tr = document.createElement("tr");
+
+                tr.innerHTML = `
+                 <td style="padding:8px; border:1px solid #ddd;">${
+                   r["Sensor Function"] ?? ""
+                 }</td>
+  <td style="padding:8px; border:1px solid #ddd;">${
+    r["Performance Measure"] ?? ""
+  }</td>
+        <td style="padding:8px; border:1px solid #ddd;">${
+          r["Measured value (%)"] ?? ""
+        }</td>
+        <td style="padding:8px; border:1px solid #ddd;">${
+          r["Sample size"] ?? ""
+        }</td>
+        <td style="padding:8px; border:1px solid #ddd;">${
+          r["Weather (F)"] ?? ""
+        }</td>
+        <td style="padding:8px; border:1px solid #ddd;">${
+          r["Lighting"] ?? ""
+        }</td>
+        <td style="padding:8px; border:1px solid #ddd;">${
+          r["Testing Notes (optional)"] ?? ""
+        }</td>
+      `;
+                tbody.appendChild(tr);
+              });
+            }
 
             detailRow.style.display = "";
             viewBtn.textContent = "Hide";
-
-            // If detail row is now open, make sure pagination didn't hide it
-            // (paginateTable respects "Hide" state)
           });
         });
       });
