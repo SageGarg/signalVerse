@@ -316,7 +316,7 @@ def process_dataset(dataset_name, base_dir):
         fhash = file_hash(file)
 
         if fhash in embedded_hashes:
-            print(f"[SKIP] {file} already embedded (hash match).")
+            # print(f"[SKIP] {file} already embedded (hash match).")
             continue
 
         # Load the file (PDF or DOCX)
@@ -610,13 +610,6 @@ OPTIONAL_METRIC_COLS = [
     "Testing Notes (optional)",
 ]
 
-# ----------------------------
-# Data loader (reads ALL files in DATA_DIR)
-# Supports: .xlsx (all sheets), .csv
-# Returns:
-#  tests: list[dict] (unique Test IDs)
-#  metrics_by_test: dict[TestID -> list[dict metric rows]]
-# ----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "sampleData")      # source-of-truth files live here
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads") # optional staging
@@ -626,6 +619,135 @@ import os
 import pandas as pd
 from flask import current_app
 
+def _norm_header_cell(x) -> str:
+    return str(x).strip().lower() if x is not None else ""
+
+# use lower-case forms for robust matching
+REQ_KEYS_LC = {"test id", "sensor function", "performance measure"}
+
+def detect_header_row(path: str, sheet_name: str, max_scan_rows: int = 25) -> int:
+    """
+    Reads the sheet with header=None and scans the first N rows to find
+    the row that looks like the header (contains required column names).
+    Returns the best header row index (0-based).
+    """
+    preview = pd.read_excel(
+        path,
+        sheet_name=sheet_name,
+        header=None,
+        dtype=object,
+        nrows=max_scan_rows,
+        engine="openpyxl",
+    )
+
+    best_row = 0
+    best_score = -1
+
+    for r in range(len(preview)):
+        row_vals = preview.iloc[r].tolist()
+        row_tokens = set(_norm_header_cell(v) for v in row_vals)
+
+        # score by how many required keys appear in that row
+        score = sum(1 for k in REQ_KEYS_LC if k in row_tokens)
+
+        # bonus: penalize rows that are mostly empty
+        nonempty = sum(1 for v in row_vals if str(v).strip() not in ("", "None", "nan"))
+        if nonempty <= 1:
+            score -= 1
+
+        if score > best_score:
+            best_score = score
+            best_row = r
+
+        # perfect match early exit
+        if score == len(REQ_KEYS_LC):
+            return r
+
+    return best_row
+
+def read_sheet_smart(path: str, sheet_name: str) -> pd.DataFrame:
+    header_row = detect_header_row(path, sheet_name)
+    df = pd.read_excel(
+        path,
+        sheet_name=sheet_name,
+        header=header_row,
+        dtype=object,
+        engine="openpyxl",
+    )
+    # clean columns
+    df.columns = [str(c).strip() for c in df.columns]
+    return df
+
+import re
+
+_CANON = {
+    "test id": "Test ID",
+    "vendor name": "Vendor Name",
+    "sensor model name": "Sensor model name",
+    "sensor technology": "Sensor Technology",
+    "stage & level": "Stage & Level",
+    "stage and level": "Stage & Level",
+    "test center": "Test Center",
+    "test location (state)": "Test Location (State)",
+    "date of testing": "Date of Testing",
+    "ground truth source": "Ground Truth Source",
+
+    "sensor function": "Sensor Function",
+    "performance measure": "Performance Measure",
+    "measured value (%)": "Measured value (%)",
+    "measured value %": "Measured value (%)",
+    "sample size": "Sample size",
+    "weather (f)": "Weather (F)",
+    "lighting": "Lighting",
+    "testing notes (optional)": "Testing Notes (optional)",
+    "testing notes": "Testing Notes (optional)",
+}
+
+def _norm_col(c) -> str:
+    s = "" if c is None else str(c)
+    s = s.replace("\u00a0", " ")            # non-breaking spaces
+    s = re.sub(r"\s+", " ", s).strip()      # collapse whitespace + strip
+    key = s.lower()
+    return _CANON.get(key, s)
+
+import math
+import numpy as np
+from datetime import date, datetime
+
+def json_safe(v):
+    # None
+    if v is None:
+        return None
+
+    # pandas/numpy NaN
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+
+    # floats: reject NaN/inf
+    if isinstance(v, float):
+        if math.isnan(v) or math.isinf(v):
+            return None
+        return v
+
+    # numpy scalars -> python
+    if isinstance(v, (np.generic,)):
+        return json_safe(v.item())
+
+    # datetime-like -> string
+    if isinstance(v, (datetime, date, pd.Timestamp)):
+        return v.isoformat()
+
+    # leave strings but strip
+    if isinstance(v, str):
+        s = v.replace("\u00a0", " ").strip()
+        return s if s != "" else None
+
+    return v
+
+
 def load_nchrp_from_files():
     DATA_DIR = os.path.join(current_app.root_path, "sampleData")
     frames = []
@@ -633,8 +755,10 @@ def load_nchrp_from_files():
     if not os.path.isdir(DATA_DIR):
         return [], {}
 
+    def clean_val(x):
+        return None if pd.isna(x) else x
+
     for fn in os.listdir(DATA_DIR):
-        # Skip temp/hidden files (Excel lock files, macOS metadata, etc.)
         if fn.startswith("~$") or fn.startswith("."):
             continue
 
@@ -647,24 +771,56 @@ def load_nchrp_from_files():
         try:
             if ext == ".csv":
                 df = pd.read_csv(path, dtype=object)
+                df.columns = [_norm_col(c) for c in df.columns]
                 df["__source__"] = fn
+                df["__sheet__"] = None
                 frames.append(df)
 
             elif ext == ".xlsx":
-                # Force engine for xlsx
                 xls = pd.ExcelFile(path, engine="openpyxl")
                 for sheet in xls.sheet_names:
                     s = pd.read_excel(xls, sheet_name=sheet, dtype=object)
+
+                    # normalize columns
+                    s.columns = [_norm_col(c) for c in s.columns]
+
+                    # drop template unnamed cols
+                    s = s.loc[:, ~s.columns.astype(str).str.startswith("Unnamed")]
+
+                    # normalize NaN -> None
+                    s = s.where(pd.notnull(s), None)
+
+                    # strip string cells
+                    for c in s.columns:
+                        if s[c].dtype == object:
+                            s[c] = s[c].apply(lambda x: x.strip() if isinstance(x, str) else x)
+
+                    # drop fully empty rows
+                    s = s.dropna(how="all")
+                    if s.empty:
+                        continue
+
+                    # forward fill within sheet for block-format tables
+                    for col in ["Test ID", "Sensor Function", "Stage & Level"]:
+                        if col in s.columns:
+                            s[col] = s[col].replace("", None).ffill()
+
+                    # if Stage & Level is still missing, skip this sheet (can't make a row key)
+                    if "Stage & Level" not in s.columns or s["Stage & Level"].isna().all():
+                        continue
+
+                    # if Test ID is missing, skip this sheet
+                    if "Test ID" not in s.columns or s["Test ID"].isna().all():
+                        continue
+
                     s["__source__"] = fn
                     s["__sheet__"] = sheet
                     frames.append(s)
 
             else:
-                # Ignore anything else (pdf, txt, xls, etc.)
                 continue
 
         except Exception as e:
-            # Don't crash the whole page because of one bad file
             print(f"[WARN] Skipping file {fn}: {e}")
             continue
 
@@ -673,59 +829,66 @@ def load_nchrp_from_files():
 
     df = pd.concat(frames, ignore_index=True)
 
-    # Clean columns
+    # final cleanup
     df.columns = [str(c).strip() for c in df.columns]
     df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
     df = df.where(pd.notnull(df), None)
 
-    # Strip string cells
     for c in df.columns:
         if df[c].dtype == object:
             df[c] = df[c].apply(lambda x: x.strip() if isinstance(x, str) else x)
 
-    # Validate required columns (summary + base metrics)
+    # validate required cols (Stage & Level now required for uniqueness)
     required = set(SUMMARY_COLS + METRIC_BASE_COLS)
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise ValueError("Missing required columns: " + ", ".join(missing))
 
-    # Forward-fill Test ID so block rows inherit the same Test ID
-    # Forward-fill Test ID so block rows inherit the same Test ID
-    df["Test ID"] = df["Test ID"].replace("", None).ffill()
-
-    # Forward-fill Sensor Function within each Test ID block (CRITICAL for Performance Measure dropdown)
-    df["Sensor Function"] = df["Sensor Function"].replace("", None)
-    df["Sensor Function"] = df.groupby("Test ID")["Sensor Function"].ffill()
-
-# Now drop rows that STILL don't have a Test ID
-    df = df[df["Test ID"].notna() & (df["Test ID"].astype(str).str.strip() != "")]
-
+    # drop rows with missing keys
+    df["Test ID"] = df["Test ID"].replace("", None)
+    df["Stage & Level"] = df["Stage & Level"].replace("", None)
+    df = df[df["Test ID"].notna() & df["Stage & Level"].notna()]
+    df = df[(df["Test ID"].astype(str).str.strip() != "") & (df["Stage & Level"].astype(str).str.strip() != "")]
     if df.empty:
         return [], {}
-    def clean_val(x):
-    # converts NaN/NaT to None so JSON is valid
-        return None if pd.isna(x) else x
+
+    # build a unique key per (Test ID + Stage & Level)
+    df["__key__"] = df["Test ID"].astype(str).str.strip() + "||" + df["Stage & Level"].astype(str).str.strip()
+
+    # -------------------
+    # 1) SUMMARY rows: unique by __key__ (NOT just Test ID)
+    # -------------------
+    # tests_df = df[SUMMARY_COLS + ["__key__"]].drop_duplicates(subset=["__key__"]).copy()
+    # tests = tests_df.fillna("").to_dict(orient="records")
+    tests_df = df[SUMMARY_COLS + ["__key__"]].drop_duplicates(subset=["__key__"]).copy()
+    tests = []
+    for _, r in tests_df.iterrows():
+        rec = {k: json_safe(r.get(k)) for k in (SUMMARY_COLS + ["__key__"])}
+        # keep empty strings out (optional)
+        for k, v in list(rec.items()):
+            if v is None:
+                rec[k] = ""
+        tests.append(rec)
 
 
-    # Tests (unique by Test ID)
-    tests_df = df[SUMMARY_COLS].drop_duplicates(subset=["Test ID"]).copy()
-    tests = tests_df.fillna("").to_dict(orient="records")
 
-    # Metrics per test
+    # -------------------
+    # 2) METRICS: also grouped by __key__
+    # -------------------
     metric_cols = [c for c in (METRIC_BASE_COLS + OPTIONAL_METRIC_COLS) if c in df.columns]
 
+    # keep source/sheet, but DO NOT add __key__ here
     for extra in ["__source__", "__sheet__"]:
         if extra in df.columns and extra not in metric_cols:
             metric_cols.append(extra)
 
-    metrics_by_test = {}
-    for _, row in df[metric_cols].iterrows():
-        tid = str(row["Test ID"]).strip()
-        metric = {k: clean_val(row[k]) for k in metric_cols if k != "Test ID"}
-        metrics_by_test.setdefault(tid, []).append(metric)
+    metrics_by_key = {}
+    for _, row in df[metric_cols + ["__key__"]].iterrows():
+        key = str(row["__key__"]).strip()
+        metric = {k: json_safe(row.get(k)) for k in metric_cols if k != "Test ID"}
+        metrics_by_key.setdefault(key, []).append(metric)
 
-
-    return tests, metrics_by_test
+    return tests, metrics_by_key
 
 
 
