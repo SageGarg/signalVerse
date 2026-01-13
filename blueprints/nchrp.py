@@ -1,4 +1,3 @@
-# nchrp_blueprint.py
 from flask import (
     Blueprint, render_template, request, session, jsonify,
     redirect, url_for, flash, current_app, send_from_directory
@@ -11,7 +10,7 @@ from werkzeug.utils import secure_filename
 from datetime import date, datetime
 from openai import OpenAI
 
-# from main2 import ALLOWED_META_EXT
+#below lists are used by upload report 
 ALLOWED_REPORT_EXT = {".xlsx", ".csv"}
 
 ALLOWED_META_EXT = {
@@ -24,8 +23,9 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
     nchrp_bp = Blueprint("nchrp_bp", __name__)
 
     # ----------------------------
-    # Put your NCHRP constants here
+    # used by load_nchrp_from_files()
     # ----------------------------
+    # same for entire sheet
     SUMMARY_COLS = [
         "Test ID",
         "Vendor Name",
@@ -50,11 +50,7 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
 
     OPTIONAL_METRIC_COLS = ["Testing Notes (optional)"]
 
-    # ----------------------------
-    # Put ALL your NCHRP helper funcs here
-    # (copy/paste from your current code)
-    # ----------------------------
-
+# if the excel file has some inconsistences in column naming
     def _norm_col(c) -> str:
         s = "" if c is None else str(c)
         s = s.replace("\u00a0", " ")
@@ -309,7 +305,7 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
             as_attachment=True
         )
 
-    # TODO: paste your upload_report and ask_ai routes here too (same idea)
+    
     def _ext(name: str) -> str:
       return os.path.splitext(name)[1].lower()
     
@@ -356,315 +352,236 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
       flash("Upload successful!")
       return redirect(url_for("nchrp_bp.testSampleReport"))
     
-    def dbg(label, value=None):
-      print("\n" + "="*80)
-      print(f"[DEBUG] {label}")
-      if value is not None:
-          if isinstance(value, (dict, list)):
-              print(json.dumps(value, indent=2)[:5000])
-          else:
-              print(value)
-      print("="*80)
+    def dbg(label, value=None, max_len=3000):
+        print("\n" + "=" * 90)
+        print(f"[ASK_AI DEBUG] {label}")
+        if value is not None:
+            try:
+                txt = json.dumps(value, indent=2, default=str)
+                print(txt[:max_len])
+            except Exception:
+                print(str(value)[:max_len])
+        print("=" * 90)
 
-
-
-# -----------------------------
-# CONFIG
-# -----------------------------
+    # -----------------------------
+    # ASK_AI (Tiered JSON) CONFIG
+    # -----------------------------
     DATA_FOLDER = os.path.join(os.getcwd(), "sampleData")  # <-- your folder
+    # -----------------------------
+    # ASK_AI (Tiered JSON) CONFIG
+    # -----------------------------
     EMBED_MODEL = "text-embedding-3-small"
-    CHAT_MODEL = "gpt-4o-mini"
+    CHAT_MODEL  = "gpt-4o-mini"
 
-    # retrieval strictness (tune)
-    VOCAB_OVERLAP_MIN = 1          # require >=1 DB term overlap to avoid gibberish
-    TOP_K = 30                     # rows returned as evidence
-    SIM_THRESHOLD = 0.22           # higher = stricter, fewer matches
+    TOP_K_KEYS = 6            # number of (TestID||Stage) groups to use as evidence
+    TOP_K_ROWS = 60           # number of row-docs used for scoring
+    SIM_THRESHOLD = 0.20      # tune if needed; lower = more inclusive
 
-    # embedding cache controls
-    CACHE_TTL_SECONDS = 10 * 60    # rebuild embeddings every 10 minutes
-    MAX_ROWS_FOR_EMBED = 25000     # safety cap
-
-# -----------------------------
-# GLOBAL CACHES (in-memory)
-# -----------------------------
-    _CACHE = {
+    ASKAI_CACHE = {
         "built_at": 0.0,
         "fingerprint": None,
-        "columns": [],
-        "rows": [],
-        "docs": [],
-        "doc_embs": None,          # np.ndarray shape (N, D)
-        "allowed_terms": set(),
-        "row_count": 0,
+        "tests": [],
+        "metrics_by_key": {},
+        "flat_rows": [],      # each row: merged summary+metric + __key__
+        "docs": [],           # doc string per flat row
+        "doc_embs": None,     # np.ndarray (N, D)
+        "row_to_key": [],     # list mapping doc index -> __key__
     }
 
-# -----------------------------
-# Helpers: normalization
-# -----------------------------
-    def clean_col(c: str) -> str:
-        return re.sub(r"\s+", " ", str(c)).strip()
-
-    def norm_str(x) -> str:
-        if x is None:
-            return ""
-        if isinstance(x, float) and np.isnan(x):
-            return ""
-        return str(x).strip()
-
-    def tokenize(text: str) -> List[str]:
-        # keeps tokens like CAL-016
-        return re.findall(r"[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)?", (text or "").lower())
-
-    def infer_stage_level_from_sheet(sheet_name: str) -> str:
-        s = (sheet_name or "").strip()
-
-        m = re.search(r"stage\D*(\d+)\D*level\D*(\d+)", s, flags=re.I)
-        if m:
-            return f"Stage {m.group(1)} Level {m.group(2)}"
-
-        m = re.search(r"\bs(\d+)\s*l(\d+)\b", s, flags=re.I)
-        if m:
-            return f"Stage {m.group(1)} Level {m.group(2)}"
-
-        return s  # fallback: keep sheet name
-
-    def cosine(a: np.ndarray, b: np.ndarray) -> float:
-        denom = float(np.linalg.norm(a) * np.linalg.norm(b))
-        if denom == 0:
-            return 0.0
-        return float(np.dot(a, b) / denom)
-
-    def read_workbook_all_sheets(filepath: str) -> List[Dict[str, Any]]:
-        xls = pd.ExcelFile(filepath)
-        all_rows: List[Dict[str, Any]] = []
-
-        # 1) First pass: find metadata from any sheet that has it
-        meta_keys = [
-            "Test ID", "Vendor Name", "Sensor model name", "Sensor Technology",
-            "Test Center", "Test Location (State)", "Date of Testing", "Ground Truth Source"
-        ]
-        meta: Dict[str, str] = {}
-
-        for sheet in xls.sheet_names:
-            df_meta = pd.read_excel(filepath, sheet_name=sheet)
-            df_meta = df_meta.loc[:, ~df_meta.columns.astype(str).str.startswith("Unnamed:")]
-            df_meta.columns = [clean_col(c) for c in df_meta.columns]
-            df_meta = df_meta.dropna(how="all")
-            if df_meta.empty:
-                continue
-
-            # normalize values
-            for c in df_meta.columns:
-                df_meta[c] = df_meta[c].apply(norm_str)
-
-            # find first row that contains any metadata fields
-            for _, r in df_meta.iterrows():
-                row = r.to_dict()
-                found_any = False
-                for k in meta_keys:
-                    if k in df_meta.columns and norm_str(row.get(k)):
-                        meta[k] = norm_str(row.get(k))
-                        found_any = True
-                if found_any:
-                    # don’t break fully — keep scanning other sheets to fill missing keys
-                    pass
-
-        # 2) Second pass: read sheets and apply metadata fill
-        for sheet in xls.sheet_names:
-            df = pd.read_excel(filepath, sheet_name=sheet)
-            df = df.loc[:, ~df.columns.astype(str).str.startswith("Unnamed:")]
-            df.columns = [clean_col(c) for c in df.columns]
-            df = df.dropna(how="all")
-            if df.empty:
-                continue
-
-            for c in df.columns:
-                df[c] = df[c].apply(norm_str)
-
-            stage_level = infer_stage_level_from_sheet(sheet)
-            rows = df.to_dict(orient="records")
-
-            for r in rows:
-                # Fill metadata if missing on that row
-                for k, v in meta.items():
-                    if k not in r or not norm_str(r.get(k)):
-                        r[k] = v
-
-                r["Source File"] = os.path.basename(filepath)
-                r["Source Sheet"] = sheet
-                if not norm_str(r.get("Stage & Level")):
-                    r["Stage & Level"] = stage_level
-
-            all_rows.extend(rows)
-
-        return all_rows
-
-
-    def load_all_excels(folder_path: str) -> Tuple[List[str], List[Dict[str, Any]]]:
-        all_rows: List[Dict[str, Any]] = []
-
-        if not os.path.isdir(folder_path):
-            raise FileNotFoundError(f"DATA_FOLDER not found: {folder_path}")
-
-        for fname in os.listdir(folder_path):
-            if not fname.lower().endswith(".xlsx"):
-                continue
-            if fname.startswith("~$"):  # skip Excel temp files
-                continue
-            fp = os.path.join(folder_path, fname)
-            all_rows.extend(read_workbook_all_sheets(fp))
-
-        # union of columns
-        cols = set()
-        for r in all_rows:
-            cols.update(r.keys())
-
-        preferred = [
-            "Test ID", "Stage & Level", "Test Center", "Test Location (State)",
-            "Sensor Technology", "Vendor Name", "Sensor model name",
-            "Sensor Function", "Performance Measure", "Measured value (%)",
-            "Sample size", "Weather (F)", "Lighting", "Testing Notes (optional)",
-            "Source File", "Source Sheet"
-        ]
-        columns = [c for c in preferred if c in cols] + sorted([c for c in cols if c not in preferred])
-
-        return columns, all_rows
-
-# -----------------------------
-# Build searchable “docs” per row + allowed vocabulary
-# -----------------------------
-    def row_to_doc(row: Dict[str, Any], columns: List[str]) -> str:
-        # Keep the doc compact but descriptive.
-        keep_cols = [
-            "Test ID", "Stage & Level", "Test Center", "Test Location (State)",
-            "Sensor Technology", "Vendor Name", "Sensor model name",
-            "Ground Truth Source",
-            "Sensor Function", "Performance Measure",
-            "Measured value (%)", "Sample size", "Weather (F)", "Lighting",
-            "Testing Notes (optional)",
-            "Source File", "Source Sheet"
-        ]
-        keep = [c for c in keep_cols if c in columns]
-        parts = []
-        for c in keep:
-            v = norm_str(row.get(c))
-            if v:
-                parts.append(f"{c}: {v}")
-        return " | ".join(parts)
-
-    def build_allowed_terms(rows: List[Dict[str, Any]], columns: List[str]) -> set:
-        """
-        DB-driven gibberish filter.
-        If a question has zero overlap with these terms, we refuse.
-        """
-        important_cols = [
-            "Test ID", "Test Center", "Test Location (State)",
-            "Sensor Technology", "Vendor Name", "Sensor model name",
-            "Stage & Level", "Sensor Function", "Performance Measure"
-        ]
-        existing = [c for c in important_cols if c in columns]
-
-        terms = set()
-
-        for r in rows:
-            for c in existing:
-                v = norm_str(r.get(c))
-                if not v:
-                    continue
-
-                # full phrase
-                terms.add(v.lower())
-
-                # token pieces
-                for t in tokenize(v):
-                    if len(t) >= 3:
-                        terms.add(t)
-
-        # include column name tokens as well
-        for c in existing:
-            for t in tokenize(c):
-                if len(t) >= 3:
-                    terms.add(t)
-
-        return terms
-
-# -----------------------------
-# Fingerprint folder (to rebuild cache when files change)
-# -----------------------------
-    def folder_fingerprint(folder_path: str) -> str:
-        """
-        Hash of filenames + mtime + size. Cheap and good enough.
-        """
+    def folder_fingerprint_sampledata() -> str:
+        """Hash filenames + mtime + size for all supported files in sampleData."""
+        data_dir = os.path.join(current_app.root_path, "sampleData")
         h = hashlib.sha256()
-        for fname in sorted(os.listdir(folder_path)):
-            if not fname.lower().endswith(".xlsx") or fname.startswith("~$"):
+        if not os.path.isdir(data_dir):
+            return "NO_DIR"
+        for fname in sorted(os.listdir(data_dir)):
+            if fname.startswith("~$") or fname.startswith("."):
                 continue
-            fp = os.path.join(folder_path, fname)
-            st = os.stat(fp)
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in [".xlsx", ".csv"]:
+                continue
+            fp = os.path.join(data_dir, fname)
+            try:
+                st = os.stat(fp)
+            except OSError:
+                continue
             h.update(fname.encode("utf-8"))
             h.update(str(st.st_mtime_ns).encode("utf-8"))
             h.update(str(st.st_size).encode("utf-8"))
         return h.hexdigest()
 
-# -----------------------------
-# Build / refresh embedding cache
-# -----------------------------
-    def ensure_cache_fresh():
-        now = time.time()
+    def norm_str(x) -> str:
+        if x is None:
+            return ""
+        try:
+            if pd.isna(x):
+                return ""
+        except Exception:
+            pass
+        return str(x).strip()
 
-        # Refresh if TTL expired or fingerprint changed
-        fp = folder_fingerprint(DATA_FOLDER)
-        ttl_expired = (now - _CACHE["built_at"]) > CACHE_TTL_SECONDS
-        fp_changed = (_CACHE["fingerprint"] != fp)
+    def row_doc(r: dict) -> str:
+        """Compact retrieval string (used for embeddings)."""
+        keep = [
+            "Test ID", "Stage & Level", "Vendor Name", "Sensor model name", "Sensor Technology",
+            "Test Center", "Test Location (State)", "Date of Testing", "Ground Truth Source",
+            "Sensor Function", "Performance Measure", "Measured value (%)", "Sample size",
+            "Weather (F)", "Lighting", "Testing Notes (optional)",
+            "__source__", "__sheet__"
+        ]
+        parts = []
+        for c in keep:
+            v = norm_str(r.get(c))
+            if v:
+                parts.append(f"{c}: {v}")
+        return " | ".join(parts)
 
-        if _CACHE["doc_embs"] is not None and not ttl_expired and not fp_changed:
+    def build_flat_rows(tests, metrics_by_key):
+        """Merge summary + metric rows into flat rows for retrieval."""
+        test_by_key = {t["__key__"]: t for t in tests}
+        flat = []
+        for key, metrics in metrics_by_key.items():
+            base = dict(test_by_key.get(key, {}))
+            for m in metrics:
+                rr = dict(base)
+                rr.update(m)
+                rr["__key__"] = key
+                flat.append(rr)
+        return flat
+
+    def tiered_json_for_key(key: str, tests, metrics_by_key) -> dict:
+        """Build hierarchical JSON for one TestID||Stage key."""
+        test_by_key = {t["__key__"]: t for t in tests}
+        base = dict(test_by_key.get(key, {}))
+
+        # remove empty strings in base for neatness
+        clean_base = {k: v for k, v in base.items() if norm_str(v) != "" and k != "__key__"}
+
+        rows = metrics_by_key.get(key, [])
+
+        grouped = {}
+        for r in rows:
+            sf = norm_str(r.get("Sensor Function")) or "Unknown"
+            entry = {}
+            # Keep only measure-level fields here
+            for c in [
+                "Performance Measure",
+                "Measured value (%)",
+                "Sample size",
+                "Weather (F)",
+                "Lighting",
+                "Testing Notes (optional)",
+                "__source__",
+                "__sheet__",
+            ]:
+                v = r.get(c)
+                if norm_str(v) != "":
+                    entry[c] = v
+            grouped.setdefault(sf, []).append(entry)
+
+        out = dict(clean_base)
+        out["sensor_functions"] = grouped
+        return out
+
+    def ensure_askai_cache_fresh():
+        """Build/refresh: tests + metrics + flat docs + embeddings."""
+        fp = folder_fingerprint_sampledata()
+        if ASKAI_CACHE["fingerprint"] == fp and ASKAI_CACHE["doc_embs"] is not None:
             return
 
-        columns, rows = load_all_excels(DATA_FOLDER)
-        if not rows:
-            # keep empty cache
-            _CACHE.update({
-                "built_at": now,
+        # 1) Use the SAME loader as /report
+        tests, metrics_by_key = load_nchrp_from_files()
+
+        flat_rows = build_flat_rows(tests, metrics_by_key)
+        docs = [row_doc(r) for r in flat_rows]
+        row_to_key = [r.get("__key__", "") for r in flat_rows]
+
+        # handle empty
+        if not docs:
+            ASKAI_CACHE.update({
+                "built_at": time.time(),
                 "fingerprint": fp,
-                "columns": columns,
-                "rows": [],
+                "tests": tests,
+                "metrics_by_key": metrics_by_key,
+                "flat_rows": [],
                 "docs": [],
                 "doc_embs": None,
-                "allowed_terms": set(),
-                "row_count": 0
+                "row_to_key": [],
             })
             return
 
-        # safety cap
-        if len(rows) > MAX_ROWS_FOR_EMBED:
-            rows = rows[:MAX_ROWS_FOR_EMBED]
-
-        docs = [row_to_doc(r, columns) for r in rows]
-        allowed_terms = build_allowed_terms(rows, columns)
-
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-        # Embed in chunks to avoid huge requests
+        # 2) Embed docs using injected client (IMPORTANT: do not create new OpenAI())
         all_embs = []
-        BATCH = 512
+        BATCH = 256
         for i in range(0, len(docs), BATCH):
-            batch_docs = docs[i:i+BATCH]
-            emb = client.embeddings.create(model=EMBED_MODEL, input=batch_docs)
+            batch = docs[i:i+BATCH]
+            emb = client.embeddings.create(model=EMBED_MODEL, input=batch)
             batch_embs = [np.array(e.embedding, dtype=np.float32) for e in emb.data]
             all_embs.extend(batch_embs)
 
-        doc_embs = np.vstack(all_embs)  # shape (N, D)
+        doc_embs = np.vstack(all_embs)
 
-        _CACHE.update({
-            "built_at": now,
+        ASKAI_CACHE.update({
+            "built_at": time.time(),
             "fingerprint": fp,
-            "columns": columns,
-            "rows": rows,
+            "tests": tests,
+            "metrics_by_key": metrics_by_key,
+            "flat_rows": flat_rows,
             "docs": docs,
             "doc_embs": doc_embs,
-            "allowed_terms": allowed_terms,
-            "row_count": len(rows),
+            "row_to_key": row_to_key,
         })
+
+    def cosine_topk_keys(question: str):
+        """Return top matching __keys__ using embedding similarity over flat row docs."""
+        ensure_askai_cache_fresh()
+        if ASKAI_CACHE["doc_embs"] is None or not ASKAI_CACHE["docs"]:
+            return []
+
+        q_emb_resp = client.embeddings.create(model=EMBED_MODEL, input=[question])
+        q_emb = np.array(q_emb_resp.data[0].embedding, dtype=np.float32)
+
+        A = ASKAI_CACHE["doc_embs"]
+        q_norm = float(np.linalg.norm(q_emb)) or 1.0
+        A_norms = np.linalg.norm(A, axis=1)
+        A_norms[A_norms == 0] = 1.0
+        sims = (A @ q_emb) / (A_norms * q_norm)
+
+        # Take top row matches first
+        top_idx = np.argsort(-sims)[:TOP_K_ROWS]
+        # ---- DEBUG: Top matching rows ----
+        top_debug = []
+        for idx in top_idx[:10]:  # only top 10 for readability
+            r = ASKAI_CACHE["flat_rows"][int(idx)]
+            top_debug.append({
+                "similarity": float(sims[idx]),
+                "Test ID": r.get("Test ID"),
+                "Stage & Level": r.get("Stage & Level"),
+                "Sensor Function": r.get("Sensor Function"),
+                "Performance Measure": r.get("Performance Measure"),
+                "Measured value (%)": r.get("Measured value (%)"),
+                "Source File": r.get("__source__"),
+                "Source Sheet": r.get("__sheet__"),
+            })
+
+        dbg("Top flat rows by similarity", top_debug)
+
+        # Aggregate scores per key (so we return best TestID||Stage groups)
+        key_scores = {}
+        for idx in top_idx:
+            s = float(sims[idx])
+            if s < SIM_THRESHOLD:
+                continue
+            k = ASKAI_CACHE["row_to_key"][int(idx)]
+            if not k:
+                continue
+            key_scores[k] = max(key_scores.get(k, 0.0), s)
+
+        # sort keys by best score
+        ranked = sorted(key_scores.items(), key=lambda x: x[1], reverse=True)
+        dbg("Aggregated TestID||Stage scores", ranked)
+
+        return [k for k, _ in ranked[:TOP_K_KEYS]]
 
     @nchrp_bp.route("/ask_ai", methods=["POST"])
     def ask_ai():
@@ -675,123 +592,45 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
         if not question:
             return jsonify({"error": "No question provided"}), 400
 
-        # 1) Ensure cache exists (loads all excel files + builds embeddings)
+        # 1) retrieve best keys (TestID||Stage groups)
         try:
-            ensure_cache_fresh()
+            keys = cosine_topk_keys(question)
         except Exception as e:
             return jsonify({"error": f"Data loading error: {e}"}), 500
 
-        dbg("Cache Status", {
-        "row_count": _CACHE["row_count"],
-        "columns": _CACHE["columns"],
-        "cache_built_at": _CACHE["built_at"],
-        })
+        if not keys:
+            return jsonify({
+                "answer": "I don't know.",
+                "matched_tests": [],
+                "debug": {"reason": "no_hits"} if debug else None
+            })
 
-        columns = _CACHE["columns"]
-        rows = _CACHE["rows"]
-        allowed_terms = _CACHE["allowed_terms"]
-        doc_embs = _CACHE["doc_embs"]
+        tests = ASKAI_CACHE["tests"]
+        metrics_by_key = ASKAI_CACHE["metrics_by_key"]
 
-        if not rows or doc_embs is None:
-            return jsonify({"answer": "I don't know.", "columns": columns, "matched_rows": []})
+        # 2) Build tiered JSON evidence per key (THIS fixes your grouping issue)
+        evidence = [tiered_json_for_key(k, tests, metrics_by_key) for k in keys]
+        dbg("Tiered JSON evidence sent to GPT", evidence)
 
-        # 2) Gibberish / unrelated guard: must overlap DB vocabulary
-        q_tokens = tokenize(question)
-        overlap = [t for t in q_tokens if t in allowed_terms]
-        dbg("Question Tokens", q_tokens)
-        dbg("Vocab Overlap", overlap)
-
-        if len(overlap) < VOCAB_OVERLAP_MIN:
-            out = {"answer": "I don't know.", "columns": columns, "matched_rows": []}
-            if debug:
-                out["debug"] = {
-                    "reason": "no_vocab_overlap",
-                    "question_tokens": q_tokens[:30],
-                    "overlap": overlap[:30],
-                    "vocab_overlap_min": VOCAB_OVERLAP_MIN
-                }
-            return jsonify(out)
-
-        # 3) Embed the question and retrieve top rows
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        q_emb_resp = client.embeddings.create(model=EMBED_MODEL, input=[question])
-        q_emb = np.array(q_emb_resp.data[0].embedding, dtype=np.float32)
-        dbg("Question Embedding Norm", float(np.linalg.norm(q_emb)))
-
-        # cosine similarity against all row embeddings
-        # sim = (A·q) / (||A|| ||q||) for each row A
-        q_norm = float(np.linalg.norm(q_emb)) or 1.0
-        A = doc_embs
-        A_norms = np.linalg.norm(A, axis=1)
-        A_norms[A_norms == 0] = 1.0
-        sims = (A @ q_emb) / (A_norms * q_norm)
-
-        # top indices
-        top_idx = np.argsort(-sims)[:TOP_K]
-        top_pairs = [(float(sims[i]), int(i)) for i in top_idx]
-        dbg(
-        "Top Similarities (Before Threshold)",
-        [
-            {
-                "rank": i + 1,
-                "similarity": float(s),
-                "Test ID": rows[idx].get("Test ID"),
-                "Sensor Function": rows[idx].get("Sensor Function"),
-                "Performance Measure": rows[idx].get("Performance Measure"),
-                "Source File": rows[idx].get("Source File"),
-            }
-            for i, (s, idx) in enumerate(top_pairs[:10])
-        ]
-        )
-
-        # threshold filter
-        kept = [(s, i) for s, i in top_pairs if s >= SIM_THRESHOLD]
-        dbg(
-        "Rows After Similarity Threshold",
-        [
-            {
-                "similarity": float(s),
-                "Test ID": rows[i].get("Test ID"),
-                "Stage & Level": rows[i].get("Stage & Level"),
-                "Sensor Function": rows[i].get("Sensor Function"),
-                "Performance Measure": rows[i].get("Performance Measure"),
-            }
-            for s, i in kept[:10]
-        ]
-        )
-
-        if not kept:
-            out = {"answer": "I don't know.", "columns": columns, "matched_rows": []}
-            if debug:
-                out["debug"] = {
-                    "reason": "semantic_no_hits",
-                    "best_similarity": top_pairs[0][0] if top_pairs else None,
-                    "threshold": SIM_THRESHOLD,
-                    "top_10": top_pairs[:10],
-                }
-            return jsonify(out)
-
-        matched_rows = [rows[i] for _, i in kept]
-        dbg("Matched Rows Sent to GPT", matched_rows[:5])
-
-        # 4) Ask GPT: MUST answer only from matched rows
+        # 3) Ask GPT with strict rules: use tiered JSON ONLY
         prompt = f"""
-    You are answering questions about an Excel database of NCHRP sensor testing.
+    You are answering questions about NCHRP sensor testing data.
+    Use ONLY the provided JSON as your source of truth.
 
     User question:
     {question}
 
-    Matched Rows (ONLY source of truth):
-    {json.dumps(matched_rows[:50], indent=2)}
+    Evidence JSON (grouped by Sensor Function -> list of Performance Measures):
+    {json.dumps(evidence, indent=2)}
 
     Rules:
-    - Answer ONLY using facts present in Matched Rows.
-    - If the answer cannot be determined from Matched Rows, reply exactly: I don't know.
-    - Do not invent, assume, or generalize beyond the data shown.
-    - If helpful, group by Stage & Level or Test Center / Sensor Technology.
-    - Be concise.
+    - Answer ONLY using facts present in Evidence JSON.
+    - If the answer cannot be determined from the JSON, reply exactly: I don't know.
+    - Do not guess missing values.
+    - When relevant, cite the Test ID and Stage & Level you used.
+    - If the question asks about a specific Sensor Function, ONLY use that group.
+    - Be concise, but include key numbers.
     """.strip()
-        dbg("Final GPT Prompt", prompt[:4000])
 
         reply = client.chat.completions.create(
             model=CHAT_MODEL,
@@ -803,23 +642,21 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
 
         out = {
             "answer": answer,
-            "columns": columns,
-            "matched_rows": matched_rows
+            "matched_tests": evidence,  # tiered output
         }
 
         if debug:
             out["debug"] = {
-                "reason": "ok",
-                "row_count_total": _CACHE["row_count"],
-                "cache_built_at": _CACHE["built_at"],
-                "vocab_overlap": overlap[:25],
-                "threshold": SIM_THRESHOLD,
-                "top_similarities": [s for s, _ in kept[:10]],
-                "matched_count": len(matched_rows),
+                "matched_keys": keys,
+                "cache_fingerprint": ASKAI_CACHE["fingerprint"],
+                "cache_built_at": ASKAI_CACHE["built_at"],
+                "top_k_keys": TOP_K_KEYS,
+                "top_k_rows": TOP_K_ROWS,
+                "sim_threshold": SIM_THRESHOLD,
             }
-        dbg("Raw GPT Answer", reply.choices[0].message.content)
 
         return jsonify(out)
+
 
 
     return nchrp_bp
