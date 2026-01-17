@@ -35,18 +35,18 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
         "Test Center",
         "Test Location (State)",
         "Date of Testing",
-        "Ground Truth Source",
+        # "Ground Truth Source",
     ]
 
+    # NEW (long-format metrics)
     METRIC_BASE_COLS = [
         "Test ID",
         "Sensor Function",
         "Performance Measure",
-        "Measured value (%)",
-        "Sample size",
-        "Weather (F)",
-        "Lighting",
+        "Field Name",
+        "Field Value",
     ]
+
 
     OPTIONAL_METRIC_COLS = ["Testing Notes (optional)"]
 
@@ -66,7 +66,7 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
             "test center": "Test Center",
             "test location (state)": "Test Location (State)",
             "date of testing": "Date of Testing",
-            "ground truth source": "Ground Truth Source",
+            # "ground truth source": "Ground Truth Source",
             "sensor function": "Sensor Function",
             "performance measure": "Performance Measure",
             "measured value (%)": "Measured value (%)",
@@ -76,6 +76,10 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
             "lighting": "Lighting",
             "testing notes (optional)": "Testing Notes (optional)",
             "testing notes": "Testing Notes (optional)",
+            "field name": "Field Name",
+            "field value": "Field Value",
+            "field_value": "Field Value",
+            "field_name": "Field Name",
         }
         return _CANON.get(key, s)
 
@@ -138,7 +142,7 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
                         if s.empty:
                             continue
 
-                        for col in ["Test ID", "Sensor Function", "Stage & Level"]:
+                        for col in ["Test ID", "Sensor Function","Performance Measure", "Stage & Level"]:
                             if col in s.columns:
                                 s[col] = s[col].replace("", None).ffill()
 
@@ -198,15 +202,44 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
         metrics_by_key = {}
         for _, row in df[metric_cols + ["__key__"]].iterrows():
             key = str(row["__key__"]).strip()
-            metric = {k: json_safe(row.get(k)) for k in metric_cols if k != "Test ID"}
-            metrics_by_key.setdefault(key, []).append(metric)
+            # Build metrics_by_key in long-format, grouped by (Sensor Function, Performance Measure)
+            metrics_by_key = {}
+
+            group_cols = ["__key__", "Sensor Function", "Performance Measure"]
+            keep_cols = SUMMARY_COLS + ["__key__", "Sensor Function", "Performance Measure", "Field Name", "Field Value", "__source__", "__sheet__"]
+            keep_cols = [c for c in keep_cols if c in df.columns]
+
+            work = df[keep_cols].copy()
+
+            # drop rows where the KV pair is missing
+            work["Field Name"] = work["Field Name"].apply(norm_str)
+            work["Field Value"] = work["Field Value"].apply(norm_str)
+            work = work[(work["Field Name"] != "") & (work["Field Value"] != "")]
+
+            for (key, sf, pm), g in work.groupby(group_cols, dropna=False):
+                key = norm_str(key)
+                sf = norm_str(sf) or "Unknown"
+                pm = norm_str(pm) or "Unknown"
+
+                fields = {}
+                for _, r in g.iterrows():
+                    fname = norm_str(r.get("Field Name"))
+                    fval  = json_safe(r.get("Field Value"))
+                    if fname:
+                        # if duplicates happen, last one wins (or you can store list)
+                        fields[fname] = fval
+
+                metrics_by_key.setdefault(key, []).append({
+                    "Sensor Function": sf,
+                    "Performance Measure": pm,
+                    "fields": fields,
+                    "__source__": g.iloc[0].get("__source__"),
+                    "__sheet__": g.iloc[0].get("__sheet__"),
+                })
+
 
         return tests, metrics_by_key
 
-    # ----------------------------
-    # Routes (copy/paste yours)
-    # Only change: use allowed_emails, client, vectorstores, mycursor_nchrp, mydb_nchrp from closure
-    # ----------------------------
 
     @nchrp_bp.route("/")
     def index_nchrp():
@@ -367,9 +400,7 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
     # ASK_AI (Tiered JSON) CONFIG
     # -----------------------------
     DATA_FOLDER = os.path.join(os.getcwd(), "sampleData")  # <-- your folder
-    # -----------------------------
-    # ASK_AI (Tiered JSON) CONFIG
-    # -----------------------------
+
     EMBED_MODEL = "text-embedding-3-small"
     CHAT_MODEL  = "gpt-4o-mini"
 
@@ -421,20 +452,25 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
         return str(x).strip()
 
     def row_doc(r: dict) -> str:
-        """Compact retrieval string (used for embeddings)."""
-        keep = [
-            "Test ID", "Stage & Level", "Vendor Name", "Sensor model name", "Sensor Technology",
-            "Test Center", "Test Location (State)", "Date of Testing", "Ground Truth Source",
-            "Sensor Function", "Performance Measure", "Measured value (%)", "Sample size",
-            "Weather (F)", "Lighting", "Testing Notes (optional)",
-            "__source__", "__sheet__"
-        ]
         parts = []
-        for c in keep:
+        for c in [
+            "Test ID", "Stage & Level", "Vendor Name", "Sensor model name", "Sensor Technology",
+            "Test Center", "Test Location (State)", "Date of Testing",
+            "Sensor Function", "Performance Measure",
+        ]:
             v = norm_str(r.get(c))
             if v:
                 parts.append(f"{c}: {v}")
+
+        # NEW: add key-values if present
+        fields = r.get("fields") or {}
+        if isinstance(fields, dict) and fields:
+            # keep it compact
+            kv = ", ".join([f"{k}={norm_str(v)}" for k, v in list(fields.items())[:12]])
+            parts.append(f"Fields: {kv}")
+
         return " | ".join(parts)
+
 
     def build_flat_rows(tests, metrics_by_key):
         """Merge summary + metric rows into flat rows for retrieval."""
@@ -450,38 +486,35 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
         return flat
 
     def tiered_json_for_key(key: str, tests, metrics_by_key) -> dict:
-        """Build hierarchical JSON for one TestID||Stage key."""
-        test_by_key = {t["__key__"]: t for t in tests}
-        base = dict(test_by_key.get(key, {}))
+      test_by_key = {t["__key__"]: t for t in tests}
+      base = dict(test_by_key.get(key, {}))
 
-        # remove empty strings in base for neatness
-        clean_base = {k: v for k, v in base.items() if norm_str(v) != "" and k != "__key__"}
+      clean_base = {k: v for k, v in base.items() if norm_str(v) != "" and k != "__key__"}
 
-        rows = metrics_by_key.get(key, [])
+      rows = metrics_by_key.get(key, [])
 
-        grouped = {}
-        for r in rows:
-            sf = norm_str(r.get("Sensor Function")) or "Unknown"
-            entry = {}
-            # Keep only measure-level fields here
-            for c in [
-                "Performance Measure",
-                "Measured value (%)",
-                "Sample size",
-                "Weather (F)",
-                "Lighting",
-                "Testing Notes (optional)",
-                "__source__",
-                "__sheet__",
-            ]:
-                v = r.get(c)
-                if norm_str(v) != "":
-                    entry[c] = v
-            grouped.setdefault(sf, []).append(entry)
+      grouped = {}
+      for r in rows:
+          sf = norm_str(r.get("Sensor Function")) or "Unknown"
+          pm = norm_str(r.get("Performance Measure")) or "Unknown"
 
-        out = dict(clean_base)
-        out["sensor_functions"] = grouped
-        return out
+          entry = {
+              "Performance Measure": pm,
+              "fields": r.get("fields", {}),
+          }
+
+          # keep provenance if you want
+          if norm_str(r.get("__source__")):
+              entry["__source__"] = r.get("__source__")
+          if norm_str(r.get("__sheet__")):
+              entry["__sheet__"] = r.get("__sheet__")
+
+          grouped.setdefault(sf, []).append(entry)
+
+      out = dict(clean_base)
+      out["sensor_functions"] = grouped
+      return out
+
 
     def ensure_askai_cache_fresh():
         """Build/refresh: tests + metrics + flat docs + embeddings."""

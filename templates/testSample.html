@@ -85,6 +85,209 @@
         text-overflow: ellipsis;
       }
     </style>
+    <style>
+  /* --- Floating Chat Widget --- */
+  .chat-fab {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    border: none;
+    background: #007bff;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    transition: transform 0.15s ease, background 0.2s ease;
+  }
+  .chat-fab:hover {
+    background: #0056b3;
+    transform: translateY(-1px);
+  }
+
+  .chat-widget {
+    position: fixed;
+    right: 18px;
+    bottom: 86px; /* sits above the button */
+    width: min(380px, calc(100vw - 36px));
+    height: 520px;
+    background: #fff;
+    border: 1px solid #e6e6e6;
+    border-radius: 14px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+    z-index: 9999;
+    overflow: hidden;
+    display: none; /* hidden by default */
+  }
+  .chat-widget.open {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat-header {
+    padding: 12px 12px;
+    background: #343a40;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .chat-header .title {
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .chat-header .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .chat-header button {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .chat-header button:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .chat-body {
+    flex: 1;
+    padding: 12px;
+    background: #f8f9fa;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+
+  .chat-footer {
+    padding: 10px;
+    border-top: 1px solid #eee;
+    background: #fff;
+  }
+  .chat-footer form {
+    display: flex;
+    gap: 8px;
+  }
+  .chat-footer input {
+    flex: 1;
+    padding: 10px 10px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+  }
+  .chat-footer button {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: none;
+    background: #007bff;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .chat-footer button:hover {
+    background: #0056b3;
+  }
+
+  .chat-msg {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .chat-msg .label {
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .chat-download-btn {
+    margin-top: 10px;
+    background: #28a745 !important;
+  }
+</style>
+<style>
+  /* ===== Detail panel styling (drilldown) ===== */
+  .detail-row td {
+    background: #f6f7f9;
+    border-top: 0;
+  }
+
+  .detail-box { overflow-x: auto; }
+.detail-box table { min-width: 720px; }
+
+
+  .detail-box {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
+    padding: 14px !important;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+  }
+
+  .detail-title {
+    font-size: 13px;
+    color: #111827;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    padding: 8px 10px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+
+  /* Make the detail table visually distinct */
+  .detail-box table {
+    border-collapse: separate !important;
+    border-spacing: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .detail-box thead th {
+    background: #eef2ff !important;   /* different from main table */
+    color: #111827 !important;
+    border: none !important;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 10px !important;
+  }
+
+  .detail-box tbody td {
+    border: none !important;
+    border-top: 1px solid #eef0f3 !important;
+    padding: 10px !important;
+    font-size: 12.5px;
+    color: #1f2937;
+    background: #ffffff;
+  }
+
+  .detail-box tbody tr:nth-child(even) td {
+    background: #fafafa;  /* subtle zebra, different from main */
+  }
+
+  /* Optional: make long notes readable */
+  .detail-box td:last-child {
+    white-space: normal;
+    line-height: 1.35;
+  }
+</style>
+<style>
+  .summary-row.is-open {
+    outline: 2px solid rgba(26, 115, 232, 0.25);
+    background: #f0f7ff !important;
+  }
+</style>
+
+
   </head>
 
   <body>
@@ -338,7 +541,7 @@
             <th>Test Center</th>
             <th>Test Location (State)</th>
             <th>Date of Testing</th>
-            <th>Ground Truth Source</th>
+            <!-- <th>Ground Truth Source</th> -->
 
             <th>Sensor Function</th>
             <th>Performance Measure</th>
@@ -363,7 +566,7 @@
             <td>{{ test["Test Center"] }}</td>
             <td>{{ test["Test Location (State)"] }}</td>
             <td>{{ test["Date of Testing"] }}</td>
-            <td>{{ test["Ground Truth Source"] }}</td>
+            <!-- <td>{{ test["Ground Truth Source"] }}</td> -->
 
             <td>
               <select class="sensorFunctionSelect">
@@ -386,7 +589,7 @@
 
           <!-- DETAIL ROW (hidden by default) -->
           <tr class="detail-row" style="display: none">
-            <td colspan="12">
+            <td colspan="11">
               <div
                 class="detail-box"
                 style="
@@ -401,40 +604,19 @@
                   style="font-weight: bold; margin-bottom: 10px"
                 ></div>
 
-                <table
-                  style="
-                    width: 100%;
-                    border-collapse: collapse;
-                    background: white;
-                  "
-                >
-                  <thead>
-                    <tr>
-                      <th style="padding: 8px; border: 1px solid #ddd">
-                        Sensor Function
-                      </th>
-                      <th style="padding: 8px; border: 1px solid #ddd">
-                        Performance Measure
-                      </th>
-                      <th style="padding: 8px; border: 1px solid #ddd">
-                        Measured value (%)
-                      </th>
-                      <th style="padding: 8px; border: 1px solid #ddd">
-                        Sample size
-                      </th>
-                      <th style="padding: 8px; border: 1px solid #ddd">
-                        Weather (F)
-                      </th>
-                      <th style="padding: 8px; border: 1px solid #ddd">
-                        Lighting
-                      </th>
-                      <th style="padding: 8px; border: 1px solid #ddd">
-                        Testing Notes
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody class="detail-tbody"></tbody>
-                </table>
+               <div style="overflow-x:auto;">
+  <table
+    style="
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    "
+  >
+    <thead class="detail-thead"></thead>
+    <tbody class="detail-tbody"></tbody>
+  </table>
+</div>
+
               </div>
             </td>
           </tr>
@@ -448,65 +630,49 @@
       style="margin-top: 15px; text-align: center"
     ></div>
 
-    <!-- Chatbot Section -->
-    <div
-      style="
-        margin-top: 40px;
-        padding: 20px;
-        background: #ffffff;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        width: 100%;
-        max-width: 900px;
-        margin-left: auto;
-        margin-right: auto;
-      "
-    >
-      <h2 style="text-align: center; margin-bottom: 15px">
-        Ask the Report Assistant 🤖
-      </h2>
-
-      <form id="chatForm" onsubmit="sendQuestion(event)">
-        <input
-          type="text"
-          id="userInput"
-          placeholder="Ask a question about any report…"
-          style="
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            font-size: 16px;
-          "
-          required
-        />
-        <button
-          style="
-            background: #007bff;
-            color: white;
-            padding: 10px 18px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-          "
-        >
-          Submit
-        </button>
-      </form>
-
-      <div
-        id="chatOutput"
-        style="
-          margin-top: 20px;
-          padding: 15px;
-          background: #f8f9fa;
-          border-radius: 6px;
-          min-height: 80px;
-          white-space: pre-wrap;
-        "
-      ></div>
+    
+    
+        
+     
     </div>
+
+    <!-- Floating Chat Widget -->
+<button id="chatFab" class="chat-fab" type="button" aria-label="Open chat">
+  💬
+</button>
+
+<div id="chatWidget" class="chat-widget" aria-hidden="true">
+  <div class="chat-header">
+    <div class="title">Report Assistant 🤖</div>
+    <div class="actions">
+      <button type="button" onclick="clearChatHistory()">Clear</button>
+      <button type="button" onclick="toggleChat(false)">—</button>
+      <button type="button" onclick="toggleChat(false)">✕</button>
+</div>
+
+  </div>
+
+  <div id="chatBody" class="chat-body">
+    <div class="chat-msg">
+      <div class="label">Hi!</div>
+      Ask a question about the reports.
+    </div>
+  </div>
+
+  <div class="chat-footer">
+    <form id="chatFormWidget" onsubmit="sendQuestion(event)">
+      <input
+        type="text"
+        id="userInput"
+        placeholder="Ask a question…"
+        autocomplete="off"
+        required
+      />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+</div>
+
 
     <script>
       // ----------------------------
@@ -734,254 +900,381 @@
       });
     </script>
 
+
     <script>
-      // ----------------------------
-      // Chat
-      // ----------------------------
-      async function sendQuestion(event) {
-        event.preventDefault();
+  // ----------------------------
+  // Floating chat open/close
+  // ----------------------------
+  const chatFab = document.getElementById("chatFab");
+  const chatWidget = document.getElementById("chatWidget");
 
-        const question = document.getElementById("userInput").value;
-        const output = document.getElementById("chatOutput");
+  function toggleChat(forceOpen) {
+    const isOpen = chatWidget.classList.contains("open");
+    const next = typeof forceOpen === "boolean" ? forceOpen : !isOpen;
 
-        output.innerHTML = `<strong>Question:</strong> ${question}<br><br>⏳ Thinking…`;
+    chatWidget.classList.toggle("open", next);
+    chatWidget.setAttribute("aria-hidden", String(!next));
 
-        const response = await fetch("{{ url_for('nchrp_bp.ask_ai') }}", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question }),
-        });
+    if (next) {
+      // focus input when opened
+      setTimeout(() => {
+        const input = document.getElementById("userInput");
+        if (input) input.focus();
+      }, 50);
+    }
+  }
 
-        const data = await response.json();
+  if (chatFab) {
+    chatFab.addEventListener("click", () => toggleChat());
+  }
 
-        if (data.error) {
-          output.innerHTML = `<span style="color:red;">${data.error}</span>`;
-          return;
-        }
+  // ----------------------------
+  // Chat (same endpoint as before)
+  // ----------------------------
+  async function sendQuestion(event) {
+    event.preventDefault();
 
-        output.innerHTML = `<p><strong>AI Answer:</strong></p><p>${data.answer}</p><br>`;
+    const question = document.getElementById("userInput").value.trim();
+    if (!question) return;
 
-        const btn = document.createElement("button");
-        btn.textContent = "⬇ Download Matched Rows (CSV)";
-        btn.style.background = "#28a745";
-        btn.style.color = "white";
-        btn.style.padding = "8px 15px";
-        btn.style.border = "none";
-        btn.style.borderRadius = "5px";
-        btn.style.cursor = "pointer";
+    // ensure widget is open
+    toggleChat(true);
 
-        btn.addEventListener("click", () => {
-          downloadMatchedCSV(data.columns, data.matched_rows);
-        });
+    const chatBody = document.getElementById("chatBody");
 
-        output.appendChild(btn);
+    // add user's question bubble
+    const qDiv = document.createElement("div");
+    qDiv.className = "chat-msg";
+    qDiv.innerHTML = `<div class="label">You</div>${escapeHtml(question)}`;
+    chatBody.appendChild(qDiv);
+
+    // add thinking bubble
+    const thinking = document.createElement("div");
+    thinking.className = "chat-msg";
+    thinking.innerHTML = `<div class="label">Assistant</div>⏳ Thinking…`;
+    chatBody.appendChild(thinking);
+
+    chatBody.scrollTop = chatBody.scrollHeight;
+
+    try {
+      const response = await fetch("{{ url_for('nchrp_bp.ask_ai') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        thinking.innerHTML = `<div class="label">Assistant</div><span style="color:#c00;">${escapeHtml(
+          data.error || "Something went wrong."
+        )}</span>`;
+        chatBody.scrollTop = chatBody.scrollHeight;
+        return;
       }
 
-      function downloadMatchedCSV(columns, rows) {
-        if (!columns || !rows) {
-          alert("No matched rows available to download.");
-          return;
-        }
+      thinking.innerHTML = `<div class="label">Assistant</div>${escapeHtml(
+        data.answer || ""
+      )}`;
 
-        const csv = [];
-        csv.push(columns.map(csvEscape).join(","));
+      // download button (matched rows)
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "⬇ Download matched rows (CSV)";
+      btn.className = "chat-download-btn";
+      btn.style.width = "100%";
+      btn.style.marginTop = "10px";
+      btn.style.border = "none";
+      btn.style.padding = "10px 12px";
+      btn.style.borderRadius = "10px";
+      btn.style.cursor = "pointer";
+      btn.style.color = "white";
 
-        rows.forEach((obj) => {
-          const rowArray = columns.map((col) => csvEscape(obj[col] ?? ""));
-          csv.push(rowArray.join(","));
-        });
+      btn.addEventListener("click", () => {
+        downloadMatchedCSV(data.columns, data.matched_rows);
+      });
 
-        const blob = new Blob([csv.join("\n")], {
-          type: "text/csv;charset=utf-8;",
-        });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "matched_reports.csv";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    </script>
+      thinking.appendChild(btn);
+
+      // clear input
+      document.getElementById("userInput").value = "";
+
+      chatBody.scrollTop = chatBody.scrollHeight;
+    } catch (err) {
+      thinking.innerHTML = `<div class="label">Assistant</div><span style="color:#c00;">Network error. Please try again.</span>`;
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+  }
+
+  async function clearChatHistory() {
+  const chatBody = document.getElementById("chatBody");
+
+  // 1) Clear UI immediately
+  chatBody.innerHTML = `
+    <div class="chat-msg">
+      <div class="label">Hi!</div>
+      Ask a question about the reports.
+    </div>
+  `;
+
+  // 2) Clear backend chat history (so it doesn't keep accumulating server-side)
+  try {
+    const res = await fetch("{{ url_for('nchrp_bp.clear_chat_history_nchrp') }}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    // Optional: if your route returns JSON
+    // const data = await res.json();
+
+    if (!res.ok) {
+      console.warn("Backend chat clear failed.");
+    }
+  } catch (e) {
+    console.warn("Network error clearing backend chat history.");
+  }
+}
+
+
+  // ----------------------------
+  // Matched CSV download (unchanged)
+  // ----------------------------
+  function downloadMatchedCSV(columns, rows) {
+    if (!columns || !rows) {
+      alert("No matched rows available to download.");
+      return;
+    }
+
+    const csv = [];
+    csv.push(columns.map(csvEscape).join(","));
+
+    rows.forEach((obj) => {
+      const rowArray = columns.map((col) => csvEscape(obj[col] ?? ""));
+      csv.push(rowArray.join(","));
+    });
+
+    const blob = new Blob([csv.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "matched_reports.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // basic HTML escape so users can't inject markup into the chat window
+  function escapeHtml(str) {
+    return (str ?? "")
+      .toString()
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+</script>
+
 
     <script>
       window.METRICS_BY_KEY = {{ metrics | tojson }};
     </script>
 
     <script>
-      // ----------------------------
-      // Drilldown: dynamic dropdowns from per-test metrics (Excel-driven)
-      // ----------------------------
-      function safeParseJson(str) {
-        try {
-          return JSON.parse(str || "[]");
-        } catch (e) {
-          console.error("metrics JSON parse failed:", e);
-          console.error("metrics raw:", (str || "").slice(0, 300));
-          return [];
+  // ----------------------------
+  // Drilldown: dropdowns + 2-row detail render
+  // ----------------------------
+
+  function uniq(arr) {
+    return Array.from(
+      new Set(
+        (arr || [])
+          .filter((x) => x !== null && x !== undefined && String(x).trim() !== "")
+          .map((x) => String(x).trim())
+      )
+    );
+  }
+
+  function setOptions(selectEl, options, includeAll = true) {
+    selectEl.innerHTML = '<option value="">Select…</option>';
+    if (includeAll) {
+      const a = document.createElement("option");
+      a.value = "__ALL__";
+      a.textContent = "All";
+      selectEl.appendChild(a);
+    }
+    options.forEach((opt) => {
+      const o = document.createElement("option");
+      o.value = opt;
+      o.textContent = opt;
+      selectEl.appendChild(o);
+    });
+  }
+
+  // You already have escapeHtml in chat script; this is a safe fallback
+  function escapeHtml(str) {
+    return (str ?? "")
+      .toString()
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const summaryRows = document.querySelectorAll("#tableBody .summary-row");
+
+    summaryRows.forEach((summaryRow) => {
+      const detailRow = summaryRow.nextElementSibling;
+      const key = summaryRow.dataset.key || "";
+
+      const metrics =
+        window.METRICS_BY_KEY && window.METRICS_BY_KEY[key]
+          ? window.METRICS_BY_KEY[key]
+          : [];
+
+      const funcSel = summaryRow.querySelector(".sensorFunctionSelect");
+      const perfSel = summaryRow.querySelector(".performanceMeasureSelect");
+      const viewBtn = summaryRow.querySelector(".toggleDetailsBtn");
+
+      if (!funcSel || !perfSel || !viewBtn || !detailRow) return;
+
+      // Populate Sensor Function options
+      const functions = uniq(metrics.map((m) => m["Sensor Function"]));
+      setOptions(funcSel, functions, true);
+
+      // Start state
+      perfSel.disabled = true;
+      viewBtn.disabled = true;
+
+      funcSel.addEventListener("change", () => {
+        const func = funcSel.value;
+
+        let filtered = metrics;
+        if (func && func !== "__ALL__") {
+          filtered = metrics.filter(
+            (m) => String(m["Sensor Function"] || "").trim() === func
+          );
         }
-      }
 
-      function uniq(arr) {
-        return Array.from(
-          new Set(
-            (arr || [])
-              .filter(
-                (x) => x !== null && x !== undefined && String(x).trim() !== ""
-              )
-              .map((x) => String(x).trim())
-          )
-        );
-      }
+        const measures = uniq(filtered.map((m) => m["Performance Measure"]));
+        setOptions(perfSel, measures, true);
 
-      function setOptions(selectEl, options, includeAll = true) {
-        selectEl.innerHTML = '<option value="">Select…</option>';
-        if (includeAll) {
-          const a = document.createElement("option");
-          a.value = "__ALL__";
-          a.textContent = "All";
-          selectEl.appendChild(a);
-        }
-        options.forEach((opt) => {
-          const o = document.createElement("option");
-          o.value = opt;
-          o.textContent = opt;
-          selectEl.appendChild(o);
-        });
-      }
+        perfSel.disabled = measures.length === 0;
+        viewBtn.disabled = false;
 
-      document.addEventListener("DOMContentLoaded", () => {
-        const summaryRows = document.querySelectorAll(
-          "#tableBody .summary-row"
-        );
-
-        summaryRows.forEach((summaryRow) => {
-          const detailRow = summaryRow.nextElementSibling;
-          const key = summaryRow.dataset.key || "";
-          const metrics =
-            window.METRICS_BY_KEY && window.METRICS_BY_KEY[key]
-              ? window.METRICS_BY_KEY[key]
-              : [];
-
-          const funcSel = summaryRow.querySelector(".sensorFunctionSelect");
-          const perfSel = summaryRow.querySelector(".performanceMeasureSelect");
-          const viewBtn = summaryRow.querySelector(".toggleDetailsBtn");
-
-          // Populate Sensor Function options from metrics in Excel
-          const functions = uniq(metrics.map((m) => m["Sensor Function"]));
-          setOptions(funcSel, functions);
-
-          funcSel.addEventListener("change", () => {
-            const func = funcSel.value;
-
-            let filtered = metrics;
-
-            // if a specific function selected, filter
-            if (func && func !== "__ALL__") {
-              filtered = metrics.filter(
-                (m) => String(m["Sensor Function"] || "").trim() === func
-              );
-            }
-
-            const measures = uniq(
-              filtered.map((m) => m["Performance Measure"])
-            );
-            setOptions(perfSel, measures, true);
-
-            perfSel.disabled = measures.length === 0;
-            viewBtn.disabled = false; // enable even if "All" selected
-
-            if (detailRow) detailRow.style.display = "none";
-            viewBtn.textContent = "View";
-          });
-
-          perfSel.addEventListener("change", () => {
-            // enable View if either a measure chosen or "All"
-            viewBtn.disabled = !perfSel.value;
-            if (detailRow) detailRow.style.display = "none";
-            viewBtn.textContent = "View";
-          });
-
-          viewBtn.addEventListener("click", () => {
-            const func = funcSel.value;
-            const measure = perfSel.value;
-
-            // require at least something selected
-            if (!func || !measure) return;
-
-            const isOpen = detailRow.style.display !== "none";
-            if (isOpen) {
-              detailRow.style.display = "none";
-              viewBtn.textContent = "View";
-              return;
-            }
-
-            // Filter rows based on selections
-            let rowsToShow = metrics;
-
-            if (func !== "__ALL__") {
-              rowsToShow = rowsToShow.filter(
-                (m) => String(m["Sensor Function"] || "").trim() === func
-              );
-            }
-
-            if (measure !== "__ALL__") {
-              rowsToShow = rowsToShow.filter(
-                (m) => String(m["Performance Measure"] || "").trim() === measure
-              );
-            }
-
-            // Update title
-            const titleFunc =
-              func === "__ALL__" ? "All Sensor Functions" : func;
-            const titleMeas = measure === "__ALL__" ? "All Measures" : measure;
-
-            const box = detailRow.querySelector(".detail-box");
-            box.querySelector(
-              ".detail-title"
-            ).textContent = `${titleFunc} → ${titleMeas}`;
-
-            // Render table rows
-            const tbody = detailRow.querySelector(".detail-tbody");
-            tbody.innerHTML = "";
-
-            if (!rowsToShow.length) {
-              tbody.innerHTML = `<tr><td colspan="5" style="padding:8px;">No rows found.</td></tr>`;
-            } else {
-              rowsToShow.forEach((r) => {
-                const tr = document.createElement("tr");
-
-                tr.innerHTML = `
-                 <td style="padding:8px; border:1px solid #ddd;">${
-                   r["Sensor Function"] ?? ""
-                 }</td>
-  <td style="padding:8px; border:1px solid #ddd;">${
-    r["Performance Measure"] ?? ""
-  }</td>
-        <td style="padding:8px; border:1px solid #ddd;">${
-          r["Measured value (%)"] ?? ""
-        }</td>
-        <td style="padding:8px; border:1px solid #ddd;">${
-          r["Sample size"] ?? ""
-        }</td>
-        <td style="padding:8px; border:1px solid #ddd;">${
-          r["Weather (F)"] ?? ""
-        }</td>
-        <td style="padding:8px; border:1px solid #ddd;">${
-          r["Lighting"] ?? ""
-        }</td>
-        <td style="padding:8px; border:1px solid #ddd;">${
-          r["Testing Notes (optional)"] ?? ""
-        }</td>
-      `;
-                tbody.appendChild(tr);
-              });
-            }
-
-            detailRow.style.display = "";
-            viewBtn.textContent = "Hide";
-          });
-        });
+        detailRow.style.display = "none";
+        viewBtn.textContent = "View";
+        summaryRow.classList.remove("is-open");
       });
-    </script>
+
+      perfSel.addEventListener("change", () => {
+        viewBtn.disabled = !perfSel.value;
+        detailRow.style.display = "none";
+        viewBtn.textContent = "View";
+        summaryRow.classList.remove("is-open");
+      });
+
+      viewBtn.addEventListener("click", () => {
+        const func = funcSel.value;
+        const measure = perfSel.value;
+
+        if (!func || !measure) return;
+
+        const isOpen = detailRow.style.display !== "none";
+        if (isOpen) {
+          detailRow.style.display = "none";
+          viewBtn.textContent = "View";
+          summaryRow.classList.remove("is-open");
+          return;
+        }
+
+        // Filter rows
+        let rowsToShow = metrics;
+
+        if (func !== "__ALL__") {
+          rowsToShow = rowsToShow.filter(
+            (m) => String(m["Sensor Function"] || "").trim() === func
+          );
+        }
+
+        if (measure !== "__ALL__") {
+          rowsToShow = rowsToShow.filter(
+            (m) => String(m["Performance Measure"] || "").trim() === measure
+          );
+        }
+
+        // Title
+        const titleFunc = func === "__ALL__" ? "All Sensor Functions" : func;
+        const titleMeas = measure === "__ALL__" ? "All Measures" : measure;
+
+        const box = detailRow.querySelector(".detail-box");
+        const titleEl = box ? box.querySelector(".detail-title") : null;
+        if (titleEl) titleEl.textContent = `${titleFunc} → ${titleMeas}`;
+
+        // 2-row render: names row in THEAD, values row in TBODY
+        const thead = detailRow.querySelector(".detail-thead");
+        const tbody = detailRow.querySelector(".detail-tbody");
+        if (!thead || !tbody) {
+          console.error("Missing .detail-thead or .detail-tbody in detail row HTML");
+          return;
+        }
+
+        thead.innerHTML = "";
+        tbody.innerHTML = "";
+
+        if (!rowsToShow.length) {
+          tbody.innerHTML = `<tr><td style="padding:8px;">No rows found.</td></tr>`;
+        } else {
+          // Merge field dictionaries from all matching rows
+          const merged = {};
+          rowsToShow.forEach((r) => {
+            const fields = r["fields"] || {};
+            Object.entries(fields).forEach(([k, v]) => {
+              merged[String(k)] = v;
+            });
+          });
+
+          const fieldNames = Object.keys(merged);
+
+          if (!fieldNames.length) {
+            tbody.innerHTML = `<tr><td style="padding:8px;">No fields available.</td></tr>`;
+          } else {
+            // Header row (field names)
+            const trHead = document.createElement("tr");
+            trHead.innerHTML = fieldNames
+              .map(
+                (name) =>
+                  `<th style="padding:8px; border:1px solid #ddd; background:#f3f4f6;">${escapeHtml(
+                    name
+                  )}</th>`
+              )
+              .join("");
+            thead.appendChild(trHead);
+
+            // Values row
+            const trVals = document.createElement("tr");
+            trVals.innerHTML = fieldNames
+              .map(
+                (name) =>
+                  `<td style="padding:8px; border:1px solid #ddd;">${escapeHtml(
+                    String(merged[name] ?? "")
+                  )}</td>`
+              )
+              .join("");
+            tbody.appendChild(trVals);
+          }
+        }
+
+        detailRow.style.display = "";
+        viewBtn.textContent = "Hide";
+        summaryRow.classList.add("is-open");
+      });
+    });
+  });
+</script>
+
   </body>
 </html>
