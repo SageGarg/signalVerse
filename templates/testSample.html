@@ -604,18 +604,8 @@
                   style="font-weight: bold; margin-bottom: 10px"
                 ></div>
 
-               <div style="overflow-x:auto;">
-  <table
-    style="
-      width: 100%;
-      border-collapse: collapse;
-      background: white;
-    "
-  >
-    <thead class="detail-thead"></thead>
-    <tbody class="detail-tbody"></tbody>
-  </table>
-</div>
+               <div class="detail-content" style="overflow-x:auto;"></div>
+
 
               </div>
             </td>
@@ -1178,100 +1168,137 @@
       });
 
       viewBtn.addEventListener("click", () => {
-        const func = funcSel.value;
-        const measure = perfSel.value;
+  const func = funcSel.value;
+  const measure = perfSel.value;
 
-        if (!func || !measure) return;
+  if (!func || !measure) return;
 
-        const isOpen = detailRow.style.display !== "none";
-        if (isOpen) {
-          detailRow.style.display = "none";
-          viewBtn.textContent = "View";
-          summaryRow.classList.remove("is-open");
-          return;
-        }
+  const isOpen = detailRow.style.display !== "none";
+  if (isOpen) {
+    detailRow.style.display = "none";
+    viewBtn.textContent = "View";
+    summaryRow.classList.remove("is-open");
+    return;
+  }
 
-        // Filter rows
-        let rowsToShow = metrics;
+  // Title
+  const titleFunc = func === "__ALL__" ? "All Sensor Functions" : func;
+  const titleMeas = measure === "__ALL__" ? "All Performance Measures" : measure;
 
-        if (func !== "__ALL__") {
-          rowsToShow = rowsToShow.filter(
-            (m) => String(m["Sensor Function"] || "").trim() === func
-          );
-        }
+  const box = detailRow.querySelector(".detail-box");
+  const titleEl = box ? box.querySelector(".detail-title") : null;
+  if (titleEl) titleEl.textContent = `${titleFunc} → ${titleMeas}`;
 
-        if (measure !== "__ALL__") {
-          rowsToShow = rowsToShow.filter(
-            (m) => String(m["Performance Measure"] || "").trim() === measure
-          );
-        }
+  // NEW: render grouped blocks when All is chosen
+  const content = detailRow.querySelector(".detail-content");
+  if (!content) {
+    console.error("Missing .detail-content container. Did you add it in HTML?");
+    return;
+  }
+  content.innerHTML = "";
 
-        // Title
-        const titleFunc = func === "__ALL__" ? "All Sensor Functions" : func;
-        const titleMeas = measure === "__ALL__" ? "All Measures" : measure;
+  // helpers
+  const norm = (x) => String(x ?? "").trim();
 
-        const box = detailRow.querySelector(".detail-box");
-        const titleEl = box ? box.querySelector(".detail-title") : null;
-        if (titleEl) titleEl.textContent = `${titleFunc} → ${titleMeas}`;
-
-        // 2-row render: names row in THEAD, values row in TBODY
-        const thead = detailRow.querySelector(".detail-thead");
-        const tbody = detailRow.querySelector(".detail-tbody");
-        if (!thead || !tbody) {
-          console.error("Missing .detail-thead or .detail-tbody in detail row HTML");
-          return;
-        }
-
-        thead.innerHTML = "";
-        tbody.innerHTML = "";
-
-        if (!rowsToShow.length) {
-          tbody.innerHTML = `<tr><td style="padding:8px;">No rows found.</td></tr>`;
-        } else {
-          // Merge field dictionaries from all matching rows
-          const merged = {};
-          rowsToShow.forEach((r) => {
-            const fields = r["fields"] || {};
-            Object.entries(fields).forEach(([k, v]) => {
-              merged[String(k)] = v;
-            });
-          });
-
-          const fieldNames = Object.keys(merged);
-
-          if (!fieldNames.length) {
-            tbody.innerHTML = `<tr><td style="padding:8px;">No fields available.</td></tr>`;
-          } else {
-            // Header row (field names)
-            const trHead = document.createElement("tr");
-            trHead.innerHTML = fieldNames
-              .map(
-                (name) =>
-                  `<th style="padding:8px; border:1px solid #ddd; background:#f3f4f6;">${escapeHtml(
-                    name
-                  )}</th>`
-              )
-              .join("");
-            thead.appendChild(trHead);
-
-            // Values row
-            const trVals = document.createElement("tr");
-            trVals.innerHTML = fieldNames
-              .map(
-                (name) =>
-                  `<td style="padding:8px; border:1px solid #ddd;">${escapeHtml(
-                    String(merged[name] ?? "")
-                  )}</td>`
-              )
-              .join("");
-            tbody.appendChild(trVals);
-          }
-        }
-
-        detailRow.style.display = "";
-        viewBtn.textContent = "Hide";
-        summaryRow.classList.add("is-open");
+  function mergeFields(rows) {
+    const merged = {};
+    rows.forEach((r) => {
+      const fields = r["fields"] || {};
+      Object.entries(fields).forEach(([k, v]) => {
+        merged[norm(k)] = v;
       });
+    });
+    return merged;
+  }
+
+  function renderBlock(funcName, pmName, merged) {
+    const fieldNames = Object.keys(merged);
+
+    if (!fieldNames.length) {
+      return `
+        <div style="margin-bottom:12px;">
+          <div style="font-weight:700; margin:6px 0;">${escapeHtml(funcName)} → ${escapeHtml(pmName)}</div>
+          <div style="padding:8px; background:#fff; border:1px solid #e5e7eb; border-radius:10px;">
+            No fields available.
+          </div>
+        </div>
+      `;
+    }
+
+    const headRow = fieldNames
+      .map((name) => `<th>${escapeHtml(name)}</th>`)
+      .join("");
+
+    const valRow = fieldNames
+      .map((name) => `<td>${escapeHtml(String(merged[name] ?? ""))}</td>`)
+      .join("");
+
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:700; margin:6px 0; font-size:13px;">
+          ${escapeHtml(funcName)} → ${escapeHtml(pmName)}
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:separate; border-spacing:0; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden; background:#fff;">
+            <thead>
+              <tr style="background:#eef2ff;">
+                ${headRow}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                ${valRow}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // Decide which sensor functions to render
+  const funcsToRender =
+    func === "__ALL__"
+      ? uniq(metrics.map((m) => m["Sensor Function"]))
+      : [func];
+
+  // Build blocks in the order: function -> measures (each measure produces 2-row block)
+  let blocks = [];
+
+  funcsToRender.forEach((f) => {
+    const rowsForFunc = metrics.filter(
+      (m) => norm(m["Sensor Function"]) === norm(f)
+    );
+
+    const measuresToRender =
+      measure === "__ALL__"
+        ? uniq(rowsForFunc.map((m) => m["Performance Measure"]))
+        : [measure];
+
+    measuresToRender.forEach((pm) => {
+      const rowsForPair = rowsForFunc.filter(
+        (m) => norm(m["Performance Measure"]) === norm(pm)
+      );
+
+      if (!rowsForPair.length) return;
+
+      const merged = mergeFields(rowsForPair);
+      blocks.push(renderBlock(f, pm, merged));
+    });
+  });
+
+  if (!blocks.length) {
+    content.innerHTML = `<div style="padding:8px;">No rows found.</div>`;
+  } else {
+    content.innerHTML = blocks.join("");
+  }
+
+  detailRow.style.display = "";
+  viewBtn.textContent = "Hide";
+  summaryRow.classList.add("is-open");
+});
+
     });
   });
 </script>
