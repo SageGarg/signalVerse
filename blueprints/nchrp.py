@@ -199,46 +199,45 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
             if extra in df.columns and extra not in metric_cols:
                 metric_cols.append(extra)
 
+        # ✅ Build metrics_by_key ONCE
         metrics_by_key = {}
-        for _, row in df[metric_cols + ["__key__"]].iterrows():
-            key = str(row["__key__"]).strip()
-            # Build metrics_by_key in long-format, grouped by (Sensor Function, Performance Measure)
-            metrics_by_key = {}
 
-            group_cols = ["__key__", "Sensor Function", "Performance Measure"]
-            keep_cols = SUMMARY_COLS + ["__key__", "Sensor Function", "Performance Measure", "Field Name", "Field Value", "__source__", "__sheet__"]
-            keep_cols = [c for c in keep_cols if c in df.columns]
+        group_cols = ["__key__", "Sensor Function", "Performance Measure"]
+        keep_cols = [
+            "__key__", "Sensor Function", "Performance Measure",
+            "Field Name", "Field Value", "__source__", "__sheet__"
+        ]
+        keep_cols = [c for c in keep_cols if c in df.columns]
 
-            work = df[keep_cols].copy()
+        work = df[keep_cols].copy()
 
-            # drop rows where the KV pair is missing
-            work["Field Name"] = work["Field Name"].apply(norm_str)
-            work["Field Value"] = work["Field Value"].apply(norm_str)
-            work = work[(work["Field Name"] != "") & (work["Field Value"] != "")]
+        # drop rows where KV pair is missing
+        work["Field Name"] = work["Field Name"].apply(norm_str)
+        work["Field Value"] = work["Field Value"].apply(norm_str)
+        work = work[(work["Field Name"] != "") & (work["Field Value"] != "")]
 
-            for (key, sf, pm), g in work.groupby(group_cols, dropna=False):
-                key = norm_str(key)
-                sf = norm_str(sf) or "Unknown"
-                pm = norm_str(pm) or "Unknown"
+        for (k, sf, pm), g in work.groupby(group_cols, dropna=False):
+            k  = norm_str(k)
+            sf = norm_str(sf) or "Unknown"
+            pm = norm_str(pm) or "Unknown"
 
-                fields = {}
-                for _, r in g.iterrows():
-                    fname = norm_str(r.get("Field Name"))
-                    fval  = json_safe(r.get("Field Value"))
-                    if fname:
-                        # if duplicates happen, last one wins (or you can store list)
-                        fields[fname] = fval
+            fields = {}
+            for _, r in g.iterrows():
+                fname = norm_str(r.get("Field Name"))
+                fval  = json_safe(r.get("Field Value"))
+                if fname:
+                    fields[fname] = fval  # last wins
 
-                metrics_by_key.setdefault(key, []).append({
-                    "Sensor Function": sf,
-                    "Performance Measure": pm,
-                    "fields": fields,
-                    "__source__": g.iloc[0].get("__source__"),
-                    "__sheet__": g.iloc[0].get("__sheet__"),
-                })
-
+            metrics_by_key.setdefault(k, []).append({
+                "Sensor Function": sf,
+                "Performance Measure": pm,
+                "fields": fields,
+                "__source__": g.iloc[0].get("__source__"),
+                "__sheet__": g.iloc[0].get("__sheet__"),
+            })
 
         return tests, metrics_by_key
+
 
 
     @nchrp_bp.route("/")
@@ -321,11 +320,13 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
     @nchrp_bp.route("/report")
     def testSampleReport():
         tests, metrics = load_nchrp_from_files()
+        meta_map = load_meta_index()
         return render_template(
             "testSample.html",
             column_headers=SUMMARY_COLS,
             tests=tests,
             metrics=metrics,
+            meta_map=meta_map,
             user_role=session.get("user_role", "public"),
             user_name=session.get("user_name", "")
         )
@@ -342,6 +343,29 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
     def _ext(name: str) -> str:
       return os.path.splitext(name)[1].lower()
     
+    def meta_index_path():
+        upload_dir = os.path.join(current_app.root_path, "uploads")
+        meta_dir = os.path.join(upload_dir, "metadata")
+        os.makedirs(meta_dir, exist_ok=True)
+        return os.path.join(meta_dir, "index.json")
+
+    def load_meta_index() -> dict:
+        p = meta_index_path()
+        if not os.path.isfile(p):
+            return {}
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f) or {}
+        except Exception:
+            return {}
+
+    def save_meta_index(d: dict) -> None:
+        p = meta_index_path()
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(d, f, indent=2)
+
+
+
 
     @nchrp_bp.route("/upload_report", methods=["POST"])
     def upload_report():
@@ -379,8 +403,14 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
 
           # store with timestamp to avoid overwriting
           ts = time.strftime("%Y%m%d-%H%M%S")
-          meta_path = os.path.join(meta_dir, f"{ts}__{meta_name}")
+          saved_meta_filename = f"{ts}__{meta_name}"
+          meta_path = os.path.join(meta_dir, saved_meta_filename)
           meta.save(meta_path)
+
+
+          idx = load_meta_index()
+          idx[report_name] = saved_meta_filename
+          save_meta_index(idx)
 
       flash("Upload successful!")
       return redirect(url_for("nchrp_bp.testSampleReport"))
@@ -418,6 +448,13 @@ def create_nchrp_blueprint(*, vectorstores, answer_question, client, allowed_ema
         "doc_embs": None,     # np.ndarray (N, D)
         "row_to_key": [],     # list mapping doc index -> __key__
     }
+
+
+    @nchrp_bp.route("/download-metadata/<path:filename>")
+    def download_metadata(filename):
+        upload_dir = os.path.join(current_app.root_path, "uploads")
+        meta_dir = os.path.join(upload_dir, "metadata")
+        return send_from_directory(meta_dir, filename, as_attachment=True)
 
     def folder_fingerprint_sampledata() -> str:
         """Hash filenames + mtime + size for all supported files in sampleData."""
